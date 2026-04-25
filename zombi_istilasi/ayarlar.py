@@ -2,15 +2,23 @@
 #  ayarlar.py — 60 Silah (Elementler) & Devasa Güncelleme
 # ============================================================
 import ctypes
+import os
 
-try:
-    user32 = ctypes.windll.user32
-    user32.SetProcessDPIAware()
-    GENISLIK = user32.GetSystemMetrics(0)
-    YUKSEKLIK = user32.GetSystemMetrics(1)
-except Exception:
-    GENISLIK = 1920
-    YUKSEKLIK = 1080
+
+def _ekran_boyutu_al():
+    """
+    Mümkünse sistemin gerçek ekran çözünürlüğünü alır.
+    Windows dışı ortamlarda güvenli varsayılan değere düşer.
+    """
+    try:
+        user32 = ctypes.windll.user32
+        user32.SetProcessDPIAware()
+        return user32.GetSystemMetrics(0), user32.GetSystemMetrics(1)
+    except Exception:
+        return 1920, 1080
+
+
+GENISLIK, YUKSEKLIK = _ekran_boyutu_al()
 
 FPS = 60
 BASLIK = "🧟 Zombi İstilası — 100+ Dev Güncelleme!"
@@ -149,6 +157,6 @@ DURUM_OYUN  = "oyun"
 DURUM_PAUSE = "pause"
 DURUM_SHOP  = "shop"
 DURUM_BITTI = "bitti"
-import os
 PROJE_DIZIN   = os.path.dirname(os.path.abspath(__file__))
 KAYIT_DOSYASI = os.path.join(PROJE_DIZIN, "kayitlar", "highscore.json")
+os.makedirs(os.path.dirname(KAYIT_DOSYASI), exist_ok=True)

@@ -32,6 +32,12 @@ class OyunEkrani:
             r = random.choice([2, 3, 5])
             c = random.choice([(30, 35, 40), (20, 25, 30), (45, 25, 25)]) # Kırmızımsı lekeler ve gri taşlar
             self._zemin.append((random.randint(-200, GENISLIK + 200), random.randint(-200, YUKSEKLIK + 200), r, c))
+
+        self.haritalar = [
+            {"isim": "Sehir Asfalti", "zemin": (10, 12, 16), "cizgi": (22, 28, 36), "karo": 80},
+            {"isim": "Laboratuvar", "zemin": (14, 22, 20), "cizgi": (45, 70, 65), "karo": 70},
+        ]
+        self.aktif_harita = 0
         
         self.is_3d = False # Direkt 3D başlasın
         self.raycaster = Raycaster(pygame.display.get_surface())
@@ -75,6 +81,10 @@ class OyunEkrani:
             except:
                 pygame.mouse.set_visible(True)
                 pygame.event.set_grab(False)
+
+    def harita_degistir(self):
+        """2D mod için farklı arena temasına geç."""
+        self.aktif_harita = (self.aktif_harita + 1) % len(self.haritalar)
 
     def guncelle(self, dt, tuslar, fare_pos):
         if self.bitti: return
@@ -221,15 +231,15 @@ class OyunEkrani:
         ox = random.randint(-4, 4) if self.sarsinti > 0 else 0
         oy = random.randint(-4, 4) if self.sarsinti > 0 else 0
 
-        # Grafik 1: Modern Karo Zemin
-        ekran.fill((10, 12, 16))
+        aktif_harita = self.haritalar[self.aktif_harita]
+        ekran.fill(aktif_harita["zemin"])
         
         # Izgara çizgileri (Fayans Derzleri)
-        kare = 80
+        kare = aktif_harita["karo"]
         for x in range(int(ox) % kare, GENISLIK, kare):
-            pygame.draw.line(ekran, (22, 28, 36), (x, 0), (x, YUKSEKLIK), 2)
+            pygame.draw.line(ekran, aktif_harita["cizgi"], (x, 0), (x, YUKSEKLIK), 2)
         for y in range(int(oy) % kare, YUKSEKLIK, kare):
-            pygame.draw.line(ekran, (22, 28, 36), (0, y), (GENISLIK, y), 2)
+            pygame.draw.line(ekran, aktif_harita["cizgi"], (0, y), (GENISLIK, y), 2)
             
         for (px, py, pr, pcolor) in self._zemin:
             pygame.draw.circle(ekran, pcolor, (px + ox, py + oy), pr)
@@ -257,8 +267,12 @@ class OyunEkrani:
         
         for s in self.sayilar: s.ciz(ekran, self.font_sayi, self.font_sayi_b)
 
-        # 2D/3D ipucu metni
-        ipucu = self.font_kucuk.render("3 Tusu ile 2D/3D Gecis", True, (200, 200, 200))
+        # 2D/3D ve Harita ipucu metni
+        ipucu = self.font_kucuk.render(
+            f"3: 2D/3D  |  M: Harita ({aktif_harita['isim']})",
+            True,
+            (200, 200, 200),
+        )
         ekran.blit(ipucu, (GENISLIK - ipucu.get_width() - 20, YUKSEKLIK - ipucu.get_height() - 20))
 
         self._ciz_hud(ekran)

@@ -55,6 +55,7 @@ class Oyuncu(pygame.sprite.Sprite):
         self.guncel_zoom = 1.0
         self.recoil = 0.0
         self.guncel_yayilma = 0.0
+        self.silah_sprite = None
 
         self._image_olustur()
         self.rect = self.image.get_rect(center=(int(self.x), int(self.y)))
@@ -66,8 +67,51 @@ class Oyuncu(pygame.sprite.Sprite):
         pygame.draw.circle(self.image, (0, 0, 0, 80), (cx + 3, cy + 3), self.yari_cap)
         pygame.draw.circle(self.image, MAVI, (cx, cy), self.yari_cap)
         pygame.draw.circle(self.image, (120, 180, 255), (cx, cy), self.yari_cap - 6)
-        pygame.draw.rect(self.image, BEYAZ, (cx, cy - 3, self.yari_cap + 12, 6))
         self._base_image = self.image.copy()
+        self._silah_sprite_guncelle()
+
+    def _silah_sprite_guncelle(self):
+        """Aktif silaha göre oyuncunun elindeki silahın 2D görünümünü üret."""
+        veri = self.silah_verisi
+        tip = veri.get("tip", "normal")
+        renk = veri.get("renk", BEYAZ)
+
+        govde_uz = self.yari_cap + 12
+        govde_yuk = 6
+
+        if tip in ("roket", "seken_bomba", "delici_patlayan"):
+            govde_uz, govde_yuk = self.yari_cap + 18, 9
+        elif tip == "alev":
+            govde_uz, govde_yuk = self.yari_cap + 14, 8
+        elif tip == "delici":
+            govde_uz, govde_yuk = self.yari_cap + 20, 5
+
+        silah = pygame.Surface((govde_uz + 12, max(20, govde_yuk + 12)), pygame.SRCALPHA)
+        merkez_y = silah.get_height() // 2
+
+        # Namlu ve gövde
+        pygame.draw.rect(silah, (25, 25, 35), (2, merkez_y - govde_yuk // 2, govde_uz, govde_yuk), border_radius=3)
+        pygame.draw.rect(
+            silah,
+            (max(0, renk[0] - 40), max(0, renk[1] - 40), max(0, renk[2] - 40)),
+            (2 + govde_uz // 3, merkez_y - govde_yuk // 2, govde_uz // 2, govde_yuk),
+            border_radius=3
+        )
+        pygame.draw.circle(silah, renk, (govde_uz + 4, merkez_y), max(2, govde_yuk // 2))
+
+        # Özel silah eki
+        if tip == "alev":
+            pygame.draw.circle(silah, (255, 120, 0, 160), (govde_uz + 7, merkez_y), govde_yuk + 2)
+        elif tip in ("roket", "seken_bomba", "delici_patlayan"):
+            pygame.draw.polygon(
+                silah,
+                (90, 90, 100),
+                [(4, merkez_y), (0, merkez_y - 4), (0, merkez_y + 4)]
+            )
+        elif tip == "delici":
+            pygame.draw.line(silah, (180, 220, 255), (govde_uz - 6, merkez_y), (govde_uz + 10, merkez_y), 1)
+
+        self.silah_sprite = silah
 
     @property
     def gercek_hiz(self): return OYUNCU_HIZ + self.yukseltmeler["hiz"] * 30
@@ -96,10 +140,12 @@ class Oyuncu(pygame.sprite.Sprite):
             self.envanter.append(silah_key)
             self.mermiler[silah_key] = self._silah_max_mermi(silah_key)
         self.aktif_silah = silah_key
+        self._silah_sprite_guncelle()
 
     def silah_degistir(self, silah_key):
         if silah_key in self.envanter:
             self.aktif_silah = silah_key
+            self._silah_sprite_guncelle()
 
     def mermileri_fulle(self):
         for s in self.envanter:
@@ -116,6 +162,7 @@ class Oyuncu(pygame.sprite.Sprite):
         if not self.envanter: return
         idx = self.envanter.index(self.aktif_silah) if self.aktif_silah in self.envanter else 0
         self.aktif_silah = self.envanter[(idx + yon) % len(self.envanter)]
+        self._silah_sprite_guncelle()
 
     def update(self, dt, tuslar, fare_pos, mermiler, ekran_w, ekran_h, serbest_bakis=False):
         sprint = tuslar.get("sprint", False)
@@ -235,6 +282,9 @@ class Oyuncu(pygame.sprite.Sprite):
             self.aci = math.degrees(math.atan2(dy, dx))
         
         img = self._base_image.copy()
+        if self.silah_sprite:
+            silah_y = img.get_height() // 2 - self.silah_sprite.get_height() // 2
+            img.blit(self.silah_sprite, (img.get_width() // 2 - 2, silah_y))
         if self.kalkan > 0:
             alpha = int(100 * (self.kalkan / self.max_kalkan_degeri))
             hale = pygame.Surface((img.get_width(), img.get_height()), pygame.SRCALPHA)
@@ -247,7 +297,14 @@ class Oyuncu(pygame.sprite.Sprite):
         # Koni her zaman aktif, silahın ve hareketin durumuna göre dinamik değişecek
         veri = self.silah_verisi
         yayilma = getattr(self, "guncel_yayilma", veri["yayilma"])
-        uzunluk = min(1200, veri["mermi_hizi"])
+        tip = veri.get("tip", "normal")
+        uzunluk = min(1400, veri["mermi_hizi"])
+        if tip == "alev":
+            uzunluk = min(500, veri["mermi_hizi"] + 120)
+        elif tip in ("roket", "seken_bomba", "delici_patlayan"):
+            uzunluk = min(900, veri["mermi_hizi"] + 250)
+        elif tip == "delici":
+            uzunluk = min(1600, veri["mermi_hizi"] + 300)
         
         merkez_x = self.x + ox
         merkez_y = self.y + oy
@@ -256,11 +313,20 @@ class Oyuncu(pygame.sprite.Sprite):
         namlu_x = merkez_x + math.cos(math.radians(self.aci)) * (self.yari_cap + 12)
         namlu_y = merkez_y + math.sin(math.radians(self.aci)) * (self.yari_cap + 12)
         
+        koni_alpha = 28
+        cizgi_alpha = 80
+        if tip == "alev":
+            koni_alpha = 55
+        elif tip in ("roket", "seken_bomba", "delici_patlayan"):
+            koni_alpha = 35
+        elif tip == "delici":
+            cizgi_alpha = 120
+
         # Eğer yayılma yoksa veya nişan alınıyorsa tek bir ince lazer çizgisi çiz
         if yayilma < 1.0:
             dx = math.cos(math.radians(self.aci)) * uzunluk
             dy = math.sin(math.radians(self.aci)) * uzunluk
-            pygame.draw.line(ekran, (*veri["renk"], 150), (namlu_x, namlu_y), (namlu_x + dx, namlu_y + dy), 2)
+            pygame.draw.line(ekran, (*veri["renk"], 160), (namlu_x, namlu_y), (namlu_x + dx, namlu_y + dy), 2)
         else:
             # Yayılma açısına göre yarı saydam bir üçgen/koni oluştur
             # Performans için özel bir Surface
@@ -274,13 +340,16 @@ class Oyuncu(pygame.sprite.Sprite):
             p2 = (cx + math.cos(aci1)*uzunluk, cy + math.sin(aci1)*uzunluk)
             p3 = (cx + math.cos(aci2)*uzunluk, cy + math.sin(aci2)*uzunluk)
             
-            pygame.draw.polygon(koni_s, (*veri["renk"], 30), [p1, p2, p3])
+            pygame.draw.polygon(koni_s, (*veri["renk"], koni_alpha), [p1, p2, p3])
             
             # Koni kenarları
-            pygame.draw.line(koni_s, (*veri["renk"], 80), p1, p2, 1)
-            pygame.draw.line(koni_s, (*veri["renk"], 80), p1, p3, 1)
+            pygame.draw.line(koni_s, (*veri["renk"], cizgi_alpha), p1, p2, 1)
+            pygame.draw.line(koni_s, (*veri["renk"], cizgi_alpha), p1, p3, 1)
             
             ekran.blit(koni_s, (int(namlu_x - cx), int(namlu_y - cy)))
+
+        # Namlu merkezine ufak hedef noktası
+        pygame.draw.circle(ekran, veri["renk"], (int(namlu_x), int(namlu_y)), 2)
 
     def _ates(self, mermiler):
         veri = self.silah_verisi
