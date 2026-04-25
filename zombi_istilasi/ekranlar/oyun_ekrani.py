@@ -26,10 +26,14 @@ class OyunEkrani:
         self.font_sayi_b = pygame.font.SysFont("Impact", 32)
         self.font_mermi  = pygame.font.SysFont("Impact", 56)
         
-        # Grafik iyileştirme: Grid (Zemin Izgarası)
-        self._zemin = [(random.randint(0, GENISLIK), random.randint(0, YUKSEKLIK)) for _ in range(500)]
+        # Grafik iyileştirme: Zemin Detayları (Kan ve Enkaz)
+        self._zemin = []
+        for _ in range(300):
+            r = random.choice([2, 3, 5])
+            c = random.choice([(30, 35, 40), (20, 25, 30), (45, 25, 25)]) # Kırmızımsı lekeler ve gri taşlar
+            self._zemin.append((random.randint(-200, GENISLIK + 200), random.randint(-200, YUKSEKLIK + 200), r, c))
         
-        self.is_3d = True # Direkt 3D başlasın
+        self.is_3d = False # Direkt 3D başlasın
         self.raycaster = Raycaster(pygame.display.get_surface())
         self._sifirla()
 
@@ -217,16 +221,18 @@ class OyunEkrani:
         ox = random.randint(-4, 4) if self.sarsinti > 0 else 0
         oy = random.randint(-4, 4) if self.sarsinti > 0 else 0
 
-        # Grafik 1: Degrade/Izgara Zemin
-        ekran.fill(ARKAPLAN)
-        # Izgara çizgileri
-        for x in range(0, GENISLIK, 150):
-            pygame.draw.line(ekran, (20, 24, 28), (x + ox, 0), (x + ox, YUKSEKLIK))
-        for y in range(0, YUKSEKLIK, 150):
-            pygame.draw.line(ekran, (20, 24, 28), (0, y + oy), (GENISLIK, y + oy))
+        # Grafik 1: Modern Karo Zemin
+        ekran.fill((10, 12, 16))
+        
+        # Izgara çizgileri (Fayans Derzleri)
+        kare = 80
+        for x in range(int(ox) % kare, GENISLIK, kare):
+            pygame.draw.line(ekran, (22, 28, 36), (x, 0), (x, YUKSEKLIK), 2)
+        for y in range(int(oy) % kare, YUKSEKLIK, kare):
+            pygame.draw.line(ekran, (22, 28, 36), (0, y), (GENISLIK, y), 2)
             
-        for (px, py) in self._zemin:
-            pygame.draw.circle(ekran, (40, 50, 40), (px + ox, py + oy), 2)
+        for (px, py, pr, pcolor) in self._zemin:
+            pygame.draw.circle(ekran, pcolor, (px + ox, py + oy), pr)
             
         for zh in self.zehir_havuzlari:
             alpha = int(90 * (zh[3] / zh[4]))
@@ -240,16 +246,20 @@ class OyunEkrani:
         if not self.bitti:
             self.oyuncu.ciz_nisangah(ekran, self.son_fare_pos, ox, oy)
 
-        for m in self.mermiler: ekran.blit(m.image, (m.rect.x + ox - m.image.get_width()//2, m.rect.y + oy - m.image.get_height()//2))
+        for m in self.mermiler: ekran.blit(m.image, (m.rect.x + ox, m.rect.y + oy))
         for p in self.patlamalar: p.ciz(ekran)
         for p in self.parcaciklar: p.ciz(ekran)
 
-        for z in self.zombiler: ekran.blit(z.image, (z.rect.x + ox - z.image.get_width()//2, z.rect.y + oy - z.image.get_height()//2))
+        for z in self.zombiler: ekran.blit(z.image, (z.rect.x + ox, z.rect.y + oy))
         for z in self.zombiler: z.can_bar_ciz(ekran)
 
-        ekran.blit(self.oyuncu.image, (self.oyuncu.rect.x + ox - self.oyuncu.image.get_width()//2, self.oyuncu.rect.y + oy - self.oyuncu.image.get_height()//2))
+        ekran.blit(self.oyuncu.image, (self.oyuncu.rect.x + ox, self.oyuncu.rect.y + oy))
         
         for s in self.sayilar: s.ciz(ekran, self.font_sayi, self.font_sayi_b)
+
+        # 2D/3D ipucu metni
+        ipucu = self.font_kucuk.render("3 Tusu ile 2D/3D Gecis", True, (200, 200, 200))
+        ekran.blit(ipucu, (GENISLIK - ipucu.get_width() - 20, YUKSEKLIK - ipucu.get_height() - 20))
 
         self._ciz_hud(ekran)
         self._ciz_bildirim(ekran)

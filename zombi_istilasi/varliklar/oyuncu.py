@@ -53,6 +53,8 @@ class Oyuncu(pygame.sprite.Sprite):
         self.durbunler = ["red_dot"] # Varsayılan olarak Red Dot olsun
         self.aktif_durbun = "red_dot"
         self.guncel_zoom = 1.0
+        self.recoil = 0.0
+        self.guncel_yayilma = 0.0
 
         self._image_olustur()
         self.rect = self.image.get_rect(center=(int(self.x), int(self.y)))
@@ -119,29 +121,38 @@ class Oyuncu(pygame.sprite.Sprite):
         sprint = tuslar.get("sprint", False)
         nisan = tuslar.get("nisan", False)
         
-        # Sağ tık (Nişan Alma) mekaniği
+        # Yayılma ve Nişan Mekaniği
         from ayarlar import DURBUNLER
+        hedef_yayilma = self.silah_verisi["yayilma"]
+
         if nisan:
             hiz_carpani = 0.4
-            # Dürbün zoomunu uygula
             d_veri = DURBUNLER.get(self.aktif_durbun, {"zoom": 1.0})
             self.guncel_zoom = d_veri["zoom"]
-            self.guncel_yayilma = self.silah_verisi["yayilma"] * (0.1 / self.guncel_zoom)
+            hedef_yayilma = self.silah_verisi["yayilma"] * (0.2 / self.guncel_zoom)
         elif sprint and self.stamina > 0 and not self.yoruldu_mu:
             self.stamina -= OYUNCU_STAMINA_HARCAMA * dt
             if self.stamina <= 0:
                 self.stamina = 0
                 self.yoruldu_mu = True
             hiz_carpani = OYUNCU_SPRINT_CARPAN
-            self.guncel_yayilma = self.silah_verisi["yayilma"] * 1.5 
+            hedef_yayilma = self.silah_verisi["yayilma"] * 2.5 
             self.guncel_zoom = 1.0
         else:
             hiz_carpani = 1.0
             self.stamina = min(self.max_stamina_degeri, self.stamina + OYUNCU_STAMINA_REGEN * dt)
             if self.stamina > 25:
                 self.yoruldu_mu = False
-            self.guncel_yayilma = self.silah_verisi["yayilma"]
             self.guncel_zoom = 1.0
+            if self.hareket_ediyor_mu:
+                hedef_yayilma = self.silah_verisi["yayilma"] * 1.5
+
+        # Recoil ekle ve yumuşak geçiş sağla (Sync Cone)
+        hedef_yayilma += self.recoil
+        self.guncel_yayilma += (hedef_yayilma - self.guncel_yayilma) * 15.0 * dt
+        
+        # Recoil'in zamanla azalması (Soğuma)
+        self.recoil = max(0.0, self.recoil - (10.0 + self.recoil * 3.0) * dt)
         
         # 3D modunda hareket oyuncunun baktığı yöne göre olmalı!
         if serbest_bakis:
@@ -233,7 +244,7 @@ class Oyuncu(pygame.sprite.Sprite):
         self.rect = self.image.get_rect(center=(int(self.x), int(self.y)))
 
     def ciz_nisangah(self, ekran, fare_pos, ox=0, oy=0):
-        # Koni çizimi
+        # Koni her zaman aktif, silahın ve hareketin durumuna göre dinamik değişecek
         veri = self.silah_verisi
         yayilma = getattr(self, "guncel_yayilma", veri["yayilma"])
         uzunluk = min(1200, veri["mermi_hizi"])
@@ -241,11 +252,15 @@ class Oyuncu(pygame.sprite.Sprite):
         merkez_x = self.x + ox
         merkez_y = self.y + oy
         
+        # Namlu ucunun (gun barrel) konumu
+        namlu_x = merkez_x + math.cos(math.radians(self.aci)) * (self.yari_cap + 12)
+        namlu_y = merkez_y + math.sin(math.radians(self.aci)) * (self.yari_cap + 12)
+        
         # Eğer yayılma yoksa veya nişan alınıyorsa tek bir ince lazer çizgisi çiz
         if yayilma < 1.0:
             dx = math.cos(math.radians(self.aci)) * uzunluk
             dy = math.sin(math.radians(self.aci)) * uzunluk
-            pygame.draw.line(ekran, (*veri["renk"], 150), (merkez_x, merkez_y), (merkez_x + dx, merkez_y + dy), 2)
+            pygame.draw.line(ekran, (*veri["renk"], 150), (namlu_x, namlu_y), (namlu_x + dx, namlu_y + dy), 2)
         else:
             # Yayılma açısına göre yarı saydam bir üçgen/koni oluştur
             # Performans için özel bir Surface
@@ -265,7 +280,7 @@ class Oyuncu(pygame.sprite.Sprite):
             pygame.draw.line(koni_s, (*veri["renk"], 80), p1, p2, 1)
             pygame.draw.line(koni_s, (*veri["renk"], 80), p1, p3, 1)
             
-            ekran.blit(koni_s, (int(merkez_x - cx), int(merkez_y - cy)))
+            ekran.blit(koni_s, (int(namlu_x - cx), int(namlu_y - cy)))
 
     def _ates(self, mermiler):
         veri = self.silah_verisi
@@ -274,11 +289,21 @@ class Oyuncu(pygame.sprite.Sprite):
         if self.aktif_silah != "tabanca":
             self.mermiler[self.aktif_silah] -= 1
             
+        # Mermilerin çıkış noktası (Namlunun ucu)
+        namlu_x = self.x + math.cos(math.radians(self.aci)) * (self.yari_cap + 12)
+        namlu_y = self.y + math.sin(math.radians(self.aci)) * (self.yari_cap + 12)
+            
         for i in range(adeti):
-            aci_offset = 0.0 if adeti == 1 else random.uniform(-yayilma / 2, yayilma / 2)
-            m = Mermi(self.x, self.y, self.aci + aci_offset, veri, self.hasar_carpani)
+            # Artık tek mermi de olsa yayılma (recoil/hareket) etki ediyor
+            aci_offset = random.uniform(-yayilma / 2, yayilma / 2)
+            m = Mermi(namlu_x, namlu_y, self.aci + aci_offset, veri, self.hasar_carpani)
             mermiler.add(m)
+            
         self.ates_sayac = veri["ates_hizi"]
+        
+        # Silaha göre Recoil (Geri tepme) ekle
+        self.recoil += veri["yayilma"] * 0.8 + 2.0
+        self.recoil = min(self.recoil, 45.0) # Maksimum recoil sınırı
         
         # Silah sesini tipine göre seç (Profesyonel Mapping)
         ses_anahtar = "ates"
