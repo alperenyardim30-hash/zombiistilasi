@@ -1,19 +1,56 @@
-# ============================================================
-#  main.py — Tam Ekran ve Sprint
-# ============================================================
-import sys
-import pygame
-from ayarlar import (
-    GENISLIK, YUKSEKLIK, FPS, BASLIK,
-    DURUM_MENU, DURUM_OYUN, DURUM_PAUSE, DURUM_SHOP, DURUM_BITTI,
-    SILAH_SIRASI
-)
-
 import os
+import sys
+
+# ============================================================
+#  main.py — Oyun döngüsü ve durum yönetimi
+# ============================================================
 
 # NVIDIA/AMD Harici Ekran Kartını Zorlamak İçin Sistem İpuçları
-os.environ['SDL_HINT_RENDER_DRIVER'] = 'direct3d11'
-os.environ['SDL_HINT_RENDER_GPU_PRIORITY'] = 'high'
+os.environ.setdefault("SDL_HINT_RENDER_DRIVER", "direct3d11")
+os.environ.setdefault("SDL_HINT_RENDER_GPU_PRIORITY", "high")
+
+import pygame
+from ayarlar import (
+    BASLIK,
+    DURUM_BITTI,
+    DURUM_MENU,
+    DURUM_OYUN,
+    DURUM_PAUSE,
+    DURUM_SHOP,
+    FPS,
+    GENISLIK,
+    SILAH_SIRASI,
+    YUKSEKLIK,
+)
+
+
+def _fare_durumu_ayarla(aktif_oyun: bool) -> None:
+    """Aktif oyunda imleci gizler, menülerde görünür yapar."""
+    pygame.mouse.set_visible(not aktif_oyun)
+    pygame.event.set_grab(aktif_oyun)
+
+
+def _ekranlari_yukle():
+    """
+    Ekran sınıflarını geç import ile yükler.
+    Modül eksikliği durumunda kullanıcıya net hata mesajı verir.
+    """
+    try:
+        from ekranlar.ana_menu import AnaMenu
+        from ekranlar.duraklama import Duraklama
+        from ekranlar.oyun_bitti import OyunBitti
+        from ekranlar.oyun_ekrani import OyunEkrani
+        from ekranlar.shop import Shop
+    except ModuleNotFoundError as exc:
+        eksik = exc.name or "bilinmeyen modül"
+        print(
+            f"[HATA] Gerekli modül bulunamadı: '{eksik}'. "
+            "Proje dosya yapısını kontrol edin.",
+            file=sys.stderr,
+        )
+        raise
+
+    return AnaMenu, OyunEkrani, Duraklama, OyunBitti, Shop
 
 def main():
     pygame.init()
@@ -25,11 +62,7 @@ def main():
     ekran = pygame.display.set_mode((GENISLIK, YUKSEKLIK), flags)
     saat  = pygame.time.Clock()
 
-    from ekranlar.ana_menu    import AnaMenu
-    from ekranlar.oyun_ekrani import OyunEkrani
-    from ekranlar.duraklama   import Duraklama
-    from ekranlar.oyun_bitti  import OyunBitti
-    from ekranlar.shop        import Shop
+    AnaMenu, OyunEkrani, Duraklama, OyunBitti, Shop = _ekranlari_yukle()
 
     ana_menu    = AnaMenu()
     oyun_ekrani = OyunEkrani()
@@ -38,8 +71,7 @@ def main():
     shop        = Shop()
 
     durum = DURUM_MENU
-    pygame.mouse.set_visible(True) # Ana menüde fare gözüksün
-    pygame.event.set_grab(False)
+    _fare_durumu_ayarla(aktif_oyun=False)
 
     while True:
         dt = min(saat.tick(FPS) / 1000.0, 0.05)
@@ -60,14 +92,14 @@ def main():
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_ESCAPE:
                         durum = DURUM_PAUSE
-                        pygame.mouse.set_visible(True)
-                        pygame.event.set_grab(False)
+                        _fare_durumu_ayarla(aktif_oyun=False)
                     elif event.key == pygame.K_b:
                         durum = DURUM_SHOP
-                        pygame.mouse.set_visible(True)
-                        pygame.event.set_grab(False)
+                        _fare_durumu_ayarla(aktif_oyun=False)
                     elif event.key == pygame.K_3:
                         oyun_ekrani.toggle_3d_mode()
+                    elif event.key == pygame.K_m and not oyun_ekrani.is_3d:
+                        oyun_ekrani.harita_degistir()
                     elif pygame.K_1 <= event.key <= pygame.K_9:
                         idx = event.key - pygame.K_1
                         sahip = [k for k in SILAH_SIRASI if k in oyun_ekrani.oyuncu.envanter]
@@ -80,15 +112,13 @@ def main():
                 if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
                     durum = DURUM_OYUN
                     if oyun_ekrani.is_3d:
-                        pygame.mouse.set_visible(False)
-                        pygame.event.set_grab(True)
+                        _fare_durumu_ayarla(aktif_oyun=True)
                 else:
                     sonuc = duraklama.tik_isle(event)
                     if sonuc == "devam":
                         durum = DURUM_OYUN
                         if oyun_ekrani.is_3d:
-                            pygame.mouse.set_visible(False)
-                            pygame.event.set_grab(True)
+                            _fare_durumu_ayarla(aktif_oyun=True)
                     elif sonuc == "menu":  durum = DURUM_MENU
                     elif sonuc == "cikis": pygame.quit(); sys.exit()
 
@@ -96,8 +126,7 @@ def main():
                 if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
                     durum = DURUM_OYUN
                     if oyun_ekrani.is_3d:
-                        pygame.mouse.set_visible(False)
-                        pygame.event.set_grab(True)
+                        _fare_durumu_ayarla(aktif_oyun=True)
                 
                 sonuc = shop.tik_isle(event, oyun_ekrani.oyuncu, oyun_ekrani.puan_sis)
                 if sonuc == "devam":
@@ -105,8 +134,7 @@ def main():
                     oyun_ekrani.dalga_sis.yeni_dalga_hazirla()
                     durum = DURUM_OYUN
                     if oyun_ekrani.is_3d:
-                        pygame.mouse.set_visible(False)
-                        pygame.event.set_grab(True)
+                        _fare_durumu_ayarla(aktif_oyun=True)
 
             elif durum == DURUM_BITTI:
                 sonuc = oyun_bitti.tik_isle(event)
@@ -137,8 +165,7 @@ def main():
                 durum = DURUM_BITTI
             elif oyun_ekrani.dalga_bitti_mi:
                 durum = DURUM_SHOP
-                pygame.mouse.set_visible(True)
-                pygame.event.set_grab(False)
+                _fare_durumu_ayarla(aktif_oyun=False)
 
         elif durum == DURUM_SHOP:
             shop.guncelle(dt)
