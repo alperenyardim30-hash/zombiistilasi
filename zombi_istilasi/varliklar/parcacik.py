@@ -99,7 +99,7 @@ class BasarimBildirimi:
         surf.fill((30, 20, 50, alpha))
         ekran.blit(surf, (bx, by))
         pygame.draw.rect(ekran, (255, 200, 0), (bx, by, bw, bh), 2, border_radius=8)
-        t1 = font_m.render(f"🏆 {self.isim}", True, (255, 200, 0))
+        t1 = font_m.render(f"[!] {self.isim}", True, (255, 200, 0))
         t2 = font_k.render(self.aciklama, True, (200, 200, 200))
         t1.set_alpha(alpha)
         t2.set_alpha(alpha)

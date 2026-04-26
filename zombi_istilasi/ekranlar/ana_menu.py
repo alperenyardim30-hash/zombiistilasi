@@ -17,8 +17,8 @@ class AnaMenu:
         self.zaman = 0.0
 
         self.butonlar = [
-            {"metin": "OYNA",    "durum": DURUM_OYUN,  "renk": YESIL},
-            {"metin": "ÇIKIŞ",   "durum": "cikis",     "renk": KIRMIZI},
+            {"metin": "OYNA",   "durum": DURUM_OYUN, "renk": YESIL},
+            {"metin": "CIKIS",  "durum": "cikis",    "renk": KIRMIZI},
         ]
 
     # ----------------------------------------------------------
@@ -49,17 +49,16 @@ class AnaMenu:
     def _ciz_baslik(self, ekran):
         # Titreyen başlık
         sal = math.sin(self.zaman * 2) * 3
-        baslik_surf = self.font_baslik.render("🧟 ZOMBİ İSTİLASI", True, BEYAZ)
-        alt_surf    = self.font_baslik.render("🧟 ZOMBİ İSTİLASI", True, KIRMIZI)
+        baslik_surf = self.font_baslik.render("ZOMBI ISTILASI", True, BEYAZ)
+        alt_surf    = self.font_baslik.render("ZOMBI ISTILASI", True, KIRMIZI)
 
         gx = GENISLIK // 2 - baslik_surf.get_width() // 2
         gy = 140
 
-        # Gölge (kırmızı offset)
         ekran.blit(alt_surf, (gx + 3, gy + 3 + int(sal)))
         ekran.blit(baslik_surf, (gx, gy + int(sal)))
 
-        alt = self.font_alt.render("— Hayatta Kal —", True, (150, 200, 150))
+        alt = self.font_alt.render("--- Hayatta Kal ---", True, (150, 200, 150))
         ekran.blit(alt, (GENISLIK // 2 - alt.get_width() // 2, gy + 75))
 
     # ----------------------------------------------------------
@@ -92,7 +91,7 @@ class AnaMenu:
 
     # ----------------------------------------------------------
     def _ciz_alt_bilgi(self, ekran):
-        ipucu = self.font_alt.render("WASD: Hareket  |  Fare: Nişan  |  Sol Tık: Ateş  |  ESC: Duraklat", True, (100, 140, 100))
+        ipucu = self.font_alt.render("WASD:Hareket | Fare:Nisan | Sol Tik:Ates | ESC:Duraklat | B:Magaza", True, (100, 140, 100))
         ekran.blit(ipucu, (GENISLIK // 2 - ipucu.get_width() // 2, YUKSEKLIK - 50))
 
     # ----------------------------------------------------------

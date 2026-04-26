@@ -13,6 +13,7 @@ from varliklar.zombi   import Zombi
 from varliklar.drop    import Drop
 from varliklar.patlama import Patlama
 from varliklar.parcacik import kan_parcaciklari, HarasarSayisi, BasarimBildirimi
+from varliklar.isik import AnlikIsin
 from sistemler.dalga_sistemi import DalgaSistemi
 from sistemler.puan_sistemi  import PuanSistemi
 from sistemler.perk_sistemi  import PerkSistemi
@@ -39,10 +40,8 @@ class OyunEkrani:
             {"isim": "Laboratuvar", "zemin": (14, 22, 20), "cizgi": (45, 70, 65), "karo": 70},
         ]
         self.aktif_harita = 0
-        
-        self.is_3d = False # Direkt 3D başlasın
-        self.raycaster = Raycaster(pygame.display.get_surface())
         self._sifirla()
+
 
     def _sifirla(self):
         self.mermiler    = pygame.sprite.Group()
@@ -53,6 +52,7 @@ class OyunEkrani:
         self.sayilar     = []
         self.basarimlar  = []
         self.zehir_havuzlari = []
+        self.anlik_isinlar   = []  # Raycast beam gorunum listesi
         
         self.oyuncu      = Oyuncu(GENISLIK // 2, YUKSEKLIK // 2)
         self.dalga_sis   = DalgaSistemi(self.zombiler)
@@ -67,47 +67,28 @@ class OyunEkrani:
 
     def baslat(self):
         self._sifirla()
-        if self.is_3d:
-            pygame.mouse.set_visible(False)
-            pygame.event.set_grab(True)
-
-    def toggle_3d_mode(self):
-        self.is_3d = not self.is_3d
-        if self.is_3d:
-            try:
-                pygame.mouse.set_relative_mode(True)
-            except:
-                pygame.mouse.set_visible(False)
-                pygame.event.set_grab(True)
-        else:
-            try:
-                pygame.mouse.set_relative_mode(False)
-            except:
-                pygame.mouse.set_visible(True)
-                pygame.event.set_grab(False)
 
     def harita_degistir(self):
-        """2D mod için farklı arena temasına geç."""
         self.aktif_harita = (self.aktif_harita + 1) % len(self.haritalar)
+
+
 
     def guncelle(self, dt, tuslar, fare_pos):
         if self.bitti: return
         
-        if self.is_3d:
-            # FPS Oyunlarındaki gibi akıcı fare kontrolü
-            rel_x, _ = pygame.mouse.get_rel()
-            
-            # Hassasiyeti ayarla (Frame rate bağımsız - dt ile çarpım)
-            # 0.15 baz hassasiyet, dt ile normalize ediyoruz
-            hassasiyet = 15.0 
-            self.oyuncu.aci += rel_x * hassasiyet * dt
-            
-            fare_pos = (GENISLIK // 2, YUKSEKLIK // 2)
-
         self.son_fare_pos = fare_pos
-        self.oyuncu.update(dt, tuslar, fare_pos, self.mermiler, GENISLIK, YUKSEKLIK, self.is_3d)
+        self.oyuncu.update(dt, tuslar, fare_pos, self.mermiler, GENISLIK, YUKSEKLIK, False)
         self.mermiler.update(dt, GENISLIK, YUKSEKLIK)
         self.puan_sis.update(dt)
+
+        # Raycast silah kuyrugunu isle
+        for rc in self.oyuncu.raycast_kuyrugu:
+            self._isle_raycast(rc)
+        self.oyuncu.raycast_kuyrugu.clear()
+
+        # Anlik isinlari guncelle
+        self.anlik_isinlar = [i for i in self.anlik_isinlar if i.update(dt)]
+
 
         for zh in self.zehir_havuzlari[:]:
             zh[3] -= dt
@@ -121,6 +102,12 @@ class OyunEkrani:
             if z.tip == "zehirli" and z.zehir_sayac >= 0.3:
                 z.zehir_sayac = 0.0
                 self.zehir_havuzlari.append([z.x, z.y, 16, 2.5, 2.5])
+            
+            # Element hasarından (yanma/zehir) ölen zombileri yakala
+            if getattr(z, "_olum_efektten", False) and z.alive():
+                z._olum_efektten = False
+                self._zombi_oldu(z, patlama_mi=False)
+                continue
                 
             if z.oyuncuya_yakin_mi(self.oyuncu.x, self.oyuncu.y):
                 if z.tip == "patlayan":
@@ -182,7 +169,12 @@ class OyunEkrani:
                         
                     oldu, zafiyet_msg, gercek_hasar = z.mermi_carpisma(m)
                     
+                    # Mermi isabet ETTİ mi? (gercek_hasar > 0 = gerçek çarpışma)
+                    if gercek_hasar <= 0:
+                        continue
+                    
                     if m.tip == "delici":
+                        # Sadece isabet eden zombiyi kaydet
                         if not hasattr(m, "vurulan_zombiler"): m.vurulan_zombiler = set()
                         m.vurulan_zombiler.add(z)
                         
@@ -197,7 +189,7 @@ class OyunEkrani:
                             self.sayilar.append(HarasarSayisi(z.x, z.y - 20, zafiyet_msg, (160, 160, 160)))
                             self.sayilar.append(HarasarSayisi(z.x, z.y, gercek_hasar, (140, 140, 140)))
                         else:
-                            self.sayilar.append(HarasarSayisi(z.x, z.y, m.hasar, m.renk))
+                            self.sayilar.append(HarasarSayisi(z.x, z.y, gercek_hasar, m.renk))
                         if oldu:
                             self._zombi_oldu(z)
                         if not m.alive():
@@ -272,17 +264,50 @@ class OyunEkrani:
 
     def _bitis(self):
         self.bitti = True
-        self.gorev_sis.dalga_bitti_kontrol(self.puan_sis)  # Görevi değerlendir
+        self.gorev_sis.dalga_bitti_kontrol(self.puan_sis)
         self.puan_sis.kaydet()
 
-    def ciz(self, ekran):
-        if self.is_3d:
-            self.raycaster.ciz(self.oyuncu, self.zombiler, self.mermiler, self.droplar)
-            self._ciz_hud(ekran)
-            self._ciz_bildirim(ekran)
-            self._ciz_silah_bar(ekran)
-            return
+    def _nokta_cizgiye_uzaklik(self, px, py, x1, y1, x2, y2):
+        """Nokta'dan cizgi segmentine en kisa mesafe."""
+        dx, dy = x2 - x1, y2 - y1
+        uzunluk_kare = dx * dx + dy * dy
+        if uzunluk_kare == 0:
+            return math.hypot(px - x1, py - y1)
+        t = max(0.0, min(1.0, ((px - x1) * dx + (py - y1) * dy) / uzunluk_kare))
+        return math.hypot(px - (x1 + t * dx), py - (y1 + t * dy))
 
+    def _isle_raycast(self, rc):
+        """Raycast silah atisi: aninda hasar + AnlikIsin gorseli olusturur."""
+        x, y = rc["x"], rc["y"]
+        aci = rc["aci"]
+        veri = rc["veri"]
+        hasar = veri["hasar"] * rc["carpan"] * self.oyuncu.hasar_carpani
+        renk = veri["renk"]
+
+        # Isin uzunlugu
+        uzunluk = min(GENISLIK + YUKSEKLIK, veri.get("mermi_hizi", 1400))
+        aci_rad = math.radians(aci)
+        bx = x + math.cos(aci_rad) * uzunluk
+        by = y + math.sin(aci_rad) * uzunluk
+
+        # Tum zombileri kontrol et — isabededenler hasar alir
+        for z in list(self.zombiler):
+            if not z.alive():
+                continue
+            uzaklik = self._nokta_cizgiye_uzaklik(z.x, z.y, x, y, bx, by)
+            if uzaklik < z.yari_cap + 3:
+                z.can -= hasar
+                z.hit_sayac = 0.12
+                self.sayilar.append(HarasarSayisi(z.x, z.y, int(hasar), renk))
+                self.parcaciklar.extend(kan_parcaciklari(z.x, z.y, 4, renk))
+                if z.can <= 0:
+                    self._zombi_oldu(z)
+
+        # Gorsel isin olustur
+        genislik = 4 if veri.get("gorsel_tip") == "the_end_isin" else 2
+        self.anlik_isinlar.append(AnlikIsin(x, y, aci, renk, uzunluk, genislik))
+
+    def ciz(self, ekran):
         ox = random.randint(-4, 4) if self.sarsinti > 0 else 0
         oy = random.randint(-4, 4) if self.sarsinti > 0 else 0
 
@@ -314,6 +339,10 @@ class OyunEkrani:
         for m in self.mermiler: ekran.blit(m.image, (m.rect.x + ox, m.rect.y + oy))
         for p in self.patlamalar: p.ciz(ekran)
         for p in self.parcaciklar: p.ciz(ekran)
+
+        # Anlik isinlari (raycast beams) ciz
+        for isin in self.anlik_isinlar:
+            isin.ciz(ekran)
 
         for z in self.zombiler: ekran.blit(z.image, (z.rect.x + ox, z.rect.y + oy))
         for z in self.zombiler: z.can_bar_ciz(ekran)

@@ -179,6 +179,7 @@ SILAHLAR["tabanca"] = {
     "isim": "Standart Tabanca", "fiyat": 0, "hasar": 35, "ates_hizi": 0.25,
     "mermi_hizi": 750, "yayilma": 2, "mermi_adeti": 1, "kapasite": -1,
     "renk": (200,200,200), "tip": "normal", "patlama_r": 0, "efekt": "yok",
+    "gorsel_tip": "normal",
     "aciklama": ["Sonsuz mermi", "Baslatici silah"]
 }
 SILAH_SIRASI.append("tabanca")
@@ -211,7 +212,39 @@ baz_fiyatlar = {
     "mjolnir": 75000, "nemesis": 40000, "the_end": 99999,
 }
 
-# Her silahi SILAHLAR'a dogrudan ekle (element yok — esssiz)
+# Gorsel tip haritasi — her silaha hangi render stili uygulanacak
+GORSEL_TIP_MAP = {
+    # Anlik isin (raycast — Mermi olusturmaz)
+    "lazer": "raycast", "lazer_mk2": "raycast", "phaser": "raycast",
+    # Iyon/enerji topu
+    "ion": "iyon_top", "taser_xl": "iyon_top",
+    # Delici serit (hizli mermi + ince serit gorunum)
+    "revolver": "delici_serit", "deagle": "delici_serit", "mateba": "delici_serit",
+    "sniper": "delici_serit", "awm": "delici_serit", "barrett": "delici_serit",
+    "intervention": "delici_serit", "cheytac": "delici_serit",
+    "rail": "delici_serit", "nemesis": "delici_serit",
+    # Sacma pellet
+    "shotgun": "pellet", "aa12": "pellet", "ksg": "pellet",
+    "spas": "pellet", "striker": "pellet", "saiga": "pellet",
+    # Alev koni
+    "alev": "alev_koni", "napalm": "alev_koni", "drakon": "alev_koni",
+    # Roket fuze
+    "roket": "roket_fuze", "thermobarik": "roket_fuze",
+    "thor": "roket_fuze", "orbital": "roket_fuze",
+    "apocalypse": "roket_fuze", "mjolnir": "roket_fuze",
+    # Plazma topu
+    "plazma": "plazma_top", "plazma_mk2": "plazma_top",
+    # Void dalgasi
+    "void": "void_dalgasi", "antimatter": "void_dalgasi",
+    # Efsanevi
+    "widowmaker": "efsane_isin",
+    # Elektrik ark
+    "zeus": "elektrik_ark",
+    # The End ozel
+    "the_end": "the_end_isin",
+}
+
+# Her silahi SILAHLAR'a dogrudan ekle
 for s_key, s_veri in TEMEL_SILAHLAR.items():
     if s_key == "tabanca": continue
     fiyat = baz_fiyatlar.get(s_key, 5000)

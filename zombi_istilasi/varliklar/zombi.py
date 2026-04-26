@@ -86,11 +86,11 @@ class Zombi(pygame.sprite.Sprite):
         """Element efektlerini işler."""
         if self.yanma_sayac > 0:
             self.yanma_sayac -= dt
-            self.can -= 15 * dt # Saniyede 15 yanma hasarı
+            self.can -= 15 * dt  # Saniyede 15 yanma hasarı
             
         if self.zehir_hasar_sayac > 0:
             self.zehir_hasar_sayac -= dt
-            self.can -= 25 * dt # Saniyede 25 zehir hasarı
+            self.can -= 25 * dt  # Saniyede 25 zehir hasarı
             
         if self.sok_sayac > 0:
             self.sok_sayac -= dt
@@ -102,6 +102,10 @@ class Zombi(pygame.sprite.Sprite):
             self.hiz = self.baz_hiz * 0.8
         else:
             self.hiz = self.baz_hiz
+        
+        # Element hasarından öldüyse işaretle (oyun_ekrani update'de yakalanır)
+        if self.can <= 0 and self.alive():
+            self._olum_efektten = True
 
     def update(self, dt, ox, oy):
         self.durum_guncelle(dt)
@@ -158,38 +162,43 @@ class Zombi(pygame.sprite.Sprite):
 
     def mermi_carpisma(self, mermi):
         """Merminin isabet edip etmediğini kontrol eder. 
-        Döndürür: (oldu, zafiyet_mesaji)
-          zafiyet_mesaji: 'ZAYIF NOKTA!' | 'DİRENÇLİ' | None
+        Döndürür: (oldu, zafiyet_mesaji, gercek_hasar)
+          gercek_hasar == 0  →  isabet YOK
         """
         mc, mr = mermi.get_circle()
-        if math.hypot(mc[0]-self.x, mc[1]-self.y) < (self.yari_cap + mr):
-            # Zafiyet çarpanı hesapla
-            zafiyet = ZAFIYET_TABLOSU.get(self.tip, {})
-            carpan = zafiyet.get(mermi.efekt, 1.0) if mermi.efekt != "yok" else 1.0
-            
-            gercek_hasar = mermi.hasar * carpan
-            self.can -= gercek_hasar
-            self.hit_sayac = 0.10
-            
-            # Zafiyet mesajı
-            zafiyet_msg = None
-            if carpan >= 1.5:
-                zafiyet_msg = "ZAYIF NOKTA!"
-            elif carpan <= 0.5:
-                zafiyet_msg = "DİRENÇLİ"
-            
-            # Efekt Uygulama
-            if mermi.efekt == "yanma": self.yanma_sayac = 3.0
-            elif mermi.efekt == "donma": self.donma_sayac = 2.0
-            elif mermi.efekt == "zehir": self.zehir_hasar_sayac = 4.0
-            elif mermi.efekt == "sok": self.sok_sayac = 1.0
-            
-            if mermi.tip != "delici":
-                if mermi.tip in ("roket", "delici_patlayan", "seken_bomba"):
-                    mermi.patlama_hazir = True
-                mermi.kill()
-            return self.can <= 0, zafiyet_msg, int(gercek_hasar)
-        return False, None, 0
+        dist = math.hypot(mc[0] - self.x, mc[1] - self.y)
+        # İsabet kontrolü — çarpışma olmadıysa (0, None, 0) döndür
+        if dist >= (self.yari_cap + mr):
+            return False, None, 0
+        
+        # Zafiyet çarpanı hesapla
+        zafiyet = ZAFIYET_TABLOSU.get(self.tip, {})
+        carpan = zafiyet.get(mermi.efekt, 1.0) if mermi.efekt != "yok" else 1.0
+        
+        gercek_hasar = mermi.hasar * carpan
+        self.can -= gercek_hasar
+        self.hit_sayac = 0.10
+        
+        # Zafiyet mesajı
+        zafiyet_msg = None
+        if carpan >= 1.5:
+            zafiyet_msg = "ZAYIF NOKTA!"
+        elif carpan <= 0.5:
+            zafiyet_msg = "DİRENÇLİ"
+        
+        # Efekt Uygulama
+        if mermi.efekt == "yanma":  self.yanma_sayac = 3.0
+        elif mermi.efekt == "donma":  self.donma_sayac = 2.0
+        elif mermi.efekt == "zehir":  self.zehir_hasar_sayac = 4.0
+        elif mermi.efekt == "sok":    self.sok_sayac = 1.0
+        
+        # Mermiyi sonlandır (delici tipler hayatta kalır)
+        if mermi.tip != "delici":
+            if mermi.tip in ("roket", "delici_patlayan", "seken_bomba"):
+                mermi.patlama_hazir = True
+            mermi.kill()
+        
+        return self.can <= 0, zafiyet_msg, int(gercek_hasar)
 
     def oyuncuya_yakin_mi(self, ox, oy):
         return math.hypot(ox-self.x, oy-self.y) < (self.yari_cap + 18)

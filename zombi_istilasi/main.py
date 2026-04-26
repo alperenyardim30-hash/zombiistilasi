@@ -74,6 +74,8 @@ def main():
 
     durum = DURUM_MENU
     _fare_durumu_ayarla(aktif_oyun=False)
+    cheat_mesaj = ""
+    cheat_mesaj_sayac = 0.0
 
     while True:
         dt = min(saat.tick(FPS) / 1000.0, 0.05)
@@ -105,22 +107,48 @@ def main():
                         sahip = [k for k in SILAH_SIRASI if k in oyun_ekrani.oyuncu.envanter]
                         if idx < len(sahip):
                             oyun_ekrani.oyuncu.silah_degistir(sahip[idx])
+                    # ── CHEAT CODES ─────────────────────────────
+                    elif event.key == pygame.K_F1:  # +10000 para
+                        oyun_ekrani.puan_sis.para += 10000
+                        cheat_mesaj = "[CHEAT] +10000$ PARA!"
+                        cheat_mesaj_sayac = 3.0
+                    elif event.key == pygame.K_F2:  # Tum silahlar
+                        from ayarlar import SILAH_SIRASI as SS, SILAHLAR as SL
+                        for k in SS:
+                            if k not in oyun_ekrani.oyuncu.envanter:
+                                oyun_ekrani.oyuncu.silah_al(k)
+                        oyun_ekrani.oyuncu.mermileri_fulle()
+                        cheat_mesaj = "[CHEAT] TUM SILAHLAR VERILDI!"
+                        cheat_mesaj_sayac = 3.0
+                    elif event.key == pygame.K_F3:  # Tam can + kalkan
+                        oyun_ekrani.oyuncu.can = oyun_ekrani.oyuncu.max_can_degeri
+                        oyun_ekrani.oyuncu.kalkan = oyun_ekrani.oyuncu.max_kalkan_degeri
+                        cheat_mesaj = "[CHEAT] TAM CAN + KALKAN!"
+                        cheat_mesaj_sayac = 3.0
+                    elif event.key == pygame.K_F4:  # Dalga atla
+                        oyun_ekrani.dalga_bitti_mi = True
+                        cheat_mesaj = "[CHEAT] DALGA ATLANDI!"
+                        cheat_mesaj_sayac = 3.0
+                    elif event.key == pygame.K_F5:  # Tum yukseltemeler max
+                        for k in oyun_ekrani.oyuncu.yukseltmeler:
+                            from ayarlar import YUKSELTMELER
+                            maks = YUKSELTMELER.get(k, {}).get("max_seviye", 10)
+                            oyun_ekrani.oyuncu.yukseltmeler[k] = maks
+                        cheat_mesaj = "[CHEAT] TUM YUKSELTMELER MAX!"
+                        cheat_mesaj_sayac = 3.0
                 elif event.type == pygame.MOUSEWHEEL:
                     oyun_ekrani.oyuncu.siradaki_silah(-event.y)
 
             elif durum == DURUM_PAUSE:
                 if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
                     durum = DURUM_OYUN
-                    if oyun_ekrani.is_3d:
-                        _fare_durumu_ayarla(aktif_oyun=True)
                 else:
                     sonuc = duraklama.tik_isle(event)
                     if sonuc == "devam":
                         durum = DURUM_OYUN
-                        if oyun_ekrani.is_3d:
-                            _fare_durumu_ayarla(aktif_oyun=True)
                     elif sonuc == "menu":  durum = DURUM_MENU
                     elif sonuc == "cikis": pygame.quit(); sys.exit()
+
 
             elif durum == DURUM_SHOP:
                 if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
@@ -208,7 +236,19 @@ def main():
         elif durum == DURUM_BITTI:
             oyun_bitti.ciz(ekran)
 
+        # Cheat mesaj countdown
+        if cheat_mesaj_sayac > 0:
+            cheat_mesaj_sayac -= dt
+
         pygame.display.flip()
+
+        # Cheat mesaji ekran uzerine (flip sonrasi degil, onunden once)
+        if cheat_mesaj_sayac > 0 and durum == DURUM_OYUN:
+            _font_cheat = pygame.font.SysFont("Consolas", 20, bold=True)
+            ct = _font_cheat.render(cheat_mesaj, True, (0, 255, 80))
+            ekran.blit(ct, (GENISLIK // 2 - ct.get_width() // 2, 12))
+            pygame.display.update(pygame.Rect(0, 0, GENISLIK, 40))
+
 
 if __name__ == "__main__":
     main()

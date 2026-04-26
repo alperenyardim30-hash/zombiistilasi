@@ -43,6 +43,7 @@ class Oyuncu(pygame.sprite.Sprite):
         self.envanter = ["tabanca"]
         self.aktif_silah = "tabanca"
         self.mermiler = {"tabanca": -1}
+        self.raycast_kuyrugu = []  # Raycast silahlar icin: [{ x, y, aci, veri, carpan }]
 
         self.yukseltmeler = {
             "can": 0, "stamina": 0, "hiz": 0, "hasar": 0, 
@@ -357,9 +358,11 @@ class Oyuncu(pygame.sprite.Sprite):
         veri = self.silah_verisi
         adeti = veri["mermi_adeti"]
         yayilma = getattr(self, "guncel_yayilma", veri["yayilma"])
+        gorsel_tip = veri.get("gorsel_tip", "normal")
+
         if self.aktif_silah != "tabanca":
             self.mermiler[self.aktif_silah] -= 1
-            
+
         # Mermilerin çıkış noktası (Namlunun ucu)
         namlu_x = self.x + math.cos(math.radians(self.aci)) * (self.yari_cap + 12)
         namlu_y = self.y + math.sin(math.radians(self.aci)) * (self.yari_cap + 12)
@@ -367,8 +370,18 @@ class Oyuncu(pygame.sprite.Sprite):
         for i in range(adeti):
             # Artık tek mermi de olsa yayılma (recoil/hareket) etki ediyor
             aci_offset = random.uniform(-yayilma / 2, yayilma / 2)
-            m = Mermi(namlu_x, namlu_y, self.aci + aci_offset, veri, self.hasar_carpani)
-            mermiler.add(m)
+            aci_final = self.aci + aci_offset
+
+            if gorsel_tip == "raycast":
+                # Anlik isin — Mermi olusturmaz, kuyruga ekler
+                self.raycast_kuyrugu.append({
+                    "x": namlu_x, "y": namlu_y,
+                    "aci": aci_final, "veri": veri,
+                    "carpan": self.hasar_carpani
+                })
+            else:
+                m = Mermi(namlu_x, namlu_y, aci_final, veri, self.hasar_carpani)
+                mermiler.add(m)
             
         self.ates_sayac = veri["ates_hizi"]
         
@@ -390,16 +403,18 @@ class Oyuncu(pygame.sprite.Sprite):
 
     def _ultimate_kullan(self, mermiler):
         self.ult_bekleme = self.ult_max_cd
-        veri = SILAHLAR["roket_ateş"].copy() if "roket_ateş" in SILAHLAR else SILAHLAR["tabanca"].copy()
-        veri["mermi_hizi"] = 700
-        veri["tip"] = "delici_patlayan"
-        veri["hasar"] = 200
-        veri["renk"] = SARI
-        veri["patlama_r"] = 120
-        veri["efekt"] = "yanma"
+        baz = SILAHLAR.get("roket", SILAHLAR["tabanca"]).copy()
+        baz["mermi_hizi"] = 700
+        baz["tip"] = "delici_patlayan"
+        baz["hasar"] = 300
+        baz["renk"] = SARI
+        baz["patlama_r"] = 140
+        baz["efekt"] = "yok"
+        baz["gorsel_tip"] = "roket_fuze"
+        baz["mermi_adeti"] = 1
         for i in range(16):
             aci = i * 22.5
-            m = Mermi(self.x, self.y, aci, veri, self.hasar_carpani * 2.0)
+            m = Mermi(self.x, self.y, aci, baz, self.hasar_carpani * 2.0)
             mermiler.add(m)
 
     def hasar_al(self, miktar):

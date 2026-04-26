@@ -97,9 +97,9 @@ class GorevSistemi:
         if basarili:
             puan_sis.para += g["bonus_para"]
             self.tamamlandi = True
-            self.bildirim_metni = f"✅ GÖREV TAMAM! +{g['bonus_para']}💰"
+            self.bildirim_metni = f"[OK] GOREV TAMAM! +{g['bonus_para']}$"
         else:
-            self.bildirim_metni = "❌ Görev başarısız."
+            self.bildirim_metni = "[X] Gorev basarisiz."
         self.bildirim_sayac = 3.0
         return basarili
 
@@ -124,7 +124,7 @@ class GorevSistemi:
             ilerleme_str = f"{self.sayac['patlama']}/{hedef}"
         elif tip == "hasar":
             ilerleme = 1.0 if self.sayac["hasar_alindi"] == 0 else 0.0
-            ilerleme_str = "✓" if self.sayac["hasar_alindi"] == 0 else "✗"
+            ilerleme_str = "OK" if self.sayac["hasar_alindi"] == 0 else "X"
         elif tip == "combo":
             ilerleme = min(1.0, self.sayac["combo_max"] / hedef)
             ilerleme_str = f"{self.sayac['combo_max']}/{hedef}"
@@ -145,7 +145,7 @@ class GorevSistemi:
         ekran.blit(panel, (px, py))
 
         # Başlık
-        t1 = font.render(f"📋 {g['isim']}", True, (255, 220, 50) if not self.tamamlandi else (80, 255, 120))
+        t1 = font.render(f"[G] {g['isim']}", True, (255, 220, 50) if not self.tamamlandi else (80, 255, 120))
         ekran.blit(t1, (px + 12, py + 8))
 
         t2 = font_kucuk.render(g["hedef"], True, (190, 190, 190))

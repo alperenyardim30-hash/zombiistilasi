@@ -34,17 +34,15 @@ class OyunBitti:
 
         # Titreyen başlık
         sal = math.sin(self.zaman * 3) * 4
-        baslik = self.font_buyuk.render("ÖLDÜN!", True, KIRMIZI)
+        baslik = self.font_buyuk.render("OLDUN!", True, KIRMIZI)
         ekran.blit(baslik, (GENISLIK // 2 - baslik.get_width() // 2, 80 + int(sal)))
 
-        # Skor ve dalga
         puan_s = self.font_orta.render(f"Puan: {self.son_puan}", True, BEYAZ)
-        dalga_s = self.font_orta.render(f"Ulaşılan Dalga: {self.son_dalga}", True, (180, 220, 180))
+        dalga_s = self.font_orta.render(f"Ulasilan Dalga: {self.son_dalga}", True, (180, 220, 180))
         ekran.blit(puan_s, (GENISLIK // 2 - puan_s.get_width() // 2, 200))
         ekran.blit(dalga_s, (GENISLIK // 2 - dalga_s.get_width() // 2, 240))
 
-        # High Score Listesi
-        hs_baslik = self.font_orta.render("— EN YÜKSEK SKORLAR —", True, YESIL)
+        hs_baslik = self.font_orta.render("--- EN YUKSEK SKORLAR ---", True, YESIL)
         ekran.blit(hs_baslik, (GENISLIK // 2 - hs_baslik.get_width() // 2, 310))
         for i, skor in enumerate(self.yuksek_skorlar[:5]):
             renk = (255, 215, 0) if i == 0 else (200, 200, 200)

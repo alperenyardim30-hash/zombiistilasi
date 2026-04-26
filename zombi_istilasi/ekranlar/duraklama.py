@@ -17,12 +17,12 @@ class Duraklama:
         overlay.fill((0, 0, 0, 170))
         ekran.blit(overlay, (0, 0))
 
-        baslik = self.font_buyuk.render("⏸ DURAKLATILDI", True, BEYAZ)
+        baslik = self.font_buyuk.render("|| DURAKLATILDI", True, BEYAZ)
         ekran.blit(baslik, (GENISLIK // 2 - baslik.get_width() // 2, 200))
 
         self._ciz_buton(ekran, "DEVAM ET",  GENISLIK // 2, 340, YESIL)
-        self._ciz_buton(ekran, "ANA MENÜ",  GENISLIK // 2, 420, (100, 150, 220))
-        self._ciz_buton(ekran, "ÇIKIŞ",     GENISLIK // 2, 500, KIRMIZI)
+        self._ciz_buton(ekran, "ANA MENU",  GENISLIK // 2, 420, (100, 150, 220))
+        self._ciz_buton(ekran, "CIKIS",     GENISLIK // 2, 500, KIRMIZI)
 
     # ----------------------------------------------------------
     def _ciz_buton(self, ekran, metin, cx, cy, renk):
