@@ -4,14 +4,14 @@
 import random
 
 PERKLER = {
-    "vampir":     {"isim": "Vampir Mermi",   "emoji": "🧛", "aciklama": "Her öldürmede +5 can",          "etki": "vampir"},
-    "patlama":    {"isim": "Zincir Patlama", "emoji": "💥", "aciklama": "Zombi ölünce yanındakine hasar", "etki": "zincir"},
-    "adrenalin":  {"isim": "Adrenalin",      "emoji": "⚡", "aciklama": "Hasar alınca +20% hız (3sn)",   "etki": "adrenalin"},
-    "manyetik":   {"isim": "Manyetik Alan",  "emoji": "🧲", "aciklama": "Drop'lar sana doğru gelir",     "etki": "manyetik"},
-    "soguk_kan":  {"isim": "Soğuk Kan",      "emoji": "🧊", "aciklama": "Nişanda zaman yavaşlar",        "etki": "zaman"},
-    "para_avcisi":{"isim": "Para Avcısı",    "emoji": "💰", "aciklama": "Her öldürmede +%50 para",       "etki": "para"},
-    "ikiz_namlu": {"isim": "İkiz Namlu",     "emoji": "🔫", "aciklama": "Her atışta 2 mermi çıkar",      "etki": "ikiz"},
-    "bumerang":   {"isim": "Bumerang",       "emoji": "🪃", "aciklama": "Mermiler geri döner",            "etki": "bumerang"},
+    "vampir":     {"isim": "[V] Vampir Mermi",   "aciklama": "Her oldürmede +5 can",         "etki": "vampir"},
+    "patlama":    {"isim": "[P] Zincir Patlama", "aciklama": "Zombi olunce yanindakine hasar","etki": "zincir"},
+    "adrenalin":  {"isim": "[A] Adrenalin",      "aciklama": "Hasar alininca +20% hiz (3sn)",  "etki": "adrenalin"},
+    "manyetik":   {"isim": "[M] Manyetik Alan",  "aciklama": "Drop'lar sana dogru gelir",     "etki": "manyetik"},
+    "soguk_kan":  {"isim": "[S] Soguk Kan",      "aciklama": "Nisanda zaman yavaslar",        "etki": "zaman"},
+    "para_avcisi":{"isim": "[G] Para Avcisi",    "aciklama": "Her oldürmede +50% para",       "etki": "para"},
+    "ikiz_namlu": {"isim": "[I] Ikiz Namlu",     "aciklama": "Her atista 2 mermi cikar",      "etki": "ikiz"},
+    "bumerang":   {"isim": "[B] Bumerang",       "aciklama": "Mermiler geri döner",           "etki": "bumerang"},
 }
 
 
@@ -73,10 +73,10 @@ class PerkSistemi:
         ekran.blit(overlay, (0, 0))
 
         # Başlık
-        t = font_buyuk.render("🎁 PERK SEÇ!", True, (255, 220, 0))
+        t = font_buyuk.render("=== PERK SEC ===", True, (255, 220, 0))
         ekran.blit(t, (genislik // 2 - t.get_width() // 2, yukseklik // 2 - 240))
 
-        sub = font_kucuk.render("Bir yetenek seç — kalıcı olarak kazanırsın!", True, (200, 200, 200))
+        sub = font_kucuk.render("Bir yetenek sec - kalici olarak kazanirsin! (1/2/3 veya tikla)", True, (200, 200, 200))
         ekran.blit(sub, (genislik // 2 - sub.get_width() // 2, yukseklik // 2 - 185))
 
         kart_gen, kart_yuk, bosluk = 280, 220, 40
@@ -96,14 +96,11 @@ class PerkSistemi:
             pygame.draw.rect(ekran, bg, (kx, ky, kart_gen, kart_yuk), border_radius=20)
             pygame.draw.rect(ekran, border, (kx, ky, kart_gen, kart_yuk), 3 if hover else 2, border_radius=20)
 
-            emoji_t = font_buyuk.render(p["emoji"], True, (255, 255, 255))
-            ekran.blit(emoji_t, (kx + kart_gen // 2 - emoji_t.get_width() // 2, ky + 20))
-
             isim_t = font_kart.render(p["isim"], True, (255, 220, 80))
-            ekran.blit(isim_t, (kx + kart_gen // 2 - isim_t.get_width() // 2, ky + 100))
+            ekran.blit(isim_t, (kx + kart_gen // 2 - isim_t.get_width() // 2, ky + 30))
 
             acik_t = font_kucuk.render(p["aciklama"], True, (200, 200, 200))
-            ekran.blit(acik_t, (kx + kart_gen // 2 - acik_t.get_width() // 2, ky + 135))
+            ekran.blit(acik_t, (kx + kart_gen // 2 - acik_t.get_width() // 2, ky + 80))
 
-            num_t = font_kucuk.render(f"[{i+1}]", True, (150, 150, 150))
+            num_t = font_kucuk.render(f"[{i+1}] veya tikla", True, (150, 150, 150))
             ekran.blit(num_t, (kx + kart_gen // 2 - num_t.get_width() // 2, ky + 175))

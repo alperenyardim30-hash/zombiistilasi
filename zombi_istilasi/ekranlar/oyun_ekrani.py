@@ -15,7 +15,6 @@ from varliklar.patlama import Patlama
 from varliklar.parcacik import kan_parcaciklari, HarasarSayisi, BasarimBildirimi
 from sistemler.dalga_sistemi import DalgaSistemi
 from sistemler.puan_sistemi  import PuanSistemi
-from sistemler.raycaster     import Raycaster
 from sistemler.perk_sistemi  import PerkSistemi
 from sistemler.gorev_sistemi import GorevSistemi
 
