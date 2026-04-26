@@ -20,7 +20,7 @@ def _ekran_boyutu_al():
 
 GENISLIK, YUKSEKLIK = _ekran_boyutu_al()
 
-FPS = 60
+FPS = 200
 BASLIK = "🧟 Zombi İstilası — 100+ Dev Güncelleme!"
 
 # Renkler
@@ -41,6 +41,29 @@ PEMBE      = (255, 100, 180)
 ZIRH_MAVI  = (60, 140, 255)
 ARKAPLAN   = (14, 18, 22)
 ZOMBI_YESIL= (90, 160, 70)
+
+# Zorluk
+ZORLUK_CARPANI = 1.0
+
+# Zombi Element Zafiyetleri (carpan >= 1.5 = ZAYIF NOKTA, <= 0.5 = DIRENCLI)
+ZAFIYET_TABLOSU = {
+    "normal":   {"yanma": 1.0, "donma": 1.0, "zehir": 1.0, "sok": 1.0},
+    "hizli":    {"yanma": 0.5, "donma": 2.0, "zehir": 1.0, "sok": 1.5},
+    "kosucu":   {"yanma": 1.0, "donma": 2.5, "zehir": 0.5, "sok": 1.0},
+    "patlayan": {"yanma": 0.2, "donma": 1.5, "zehir": 1.0, "sok": 2.0},
+    "zehirli":  {"yanma": 1.5, "donma": 1.0, "zehir": 0.1, "sok": 1.0},
+    "boss":     {"yanma": 0.3, "donma": 2.0, "zehir": 1.2, "sok": 0.5},
+}
+
+# Dalga Modifikatörleri
+DALGA_MODLARI = [
+    {"isim": "HIZLI SÜRÜ",     "aciklama": "Tüm zombiler %50 daha hızlı!",      "renk": (255, 100, 0),  "efekt": "hiz"},
+    {"isim": "ZİRHLI ORDU",   "aciklama": "Zombilerin canı %75 fazla!",        "renk": (100, 100, 255),"efekt": "zirh"},
+    {"isim": "KARANLIK DALGA","aciklama": "Görüş alanı kısıtlı!",            "renk": (50, 50, 50),   "efekt": "karanlik"},
+    {"isim": "BEREKET DALGASI","aciklama": "Zombiler 2x para bırakıyor!",      "renk": (255, 215, 0),  "efekt": "para"},
+    {"isim": "BOSS KORUMALARI","aciklama": "Mini bosslar ile geliyor!",         "renk": (160, 0, 255),  "efekt": "mini_boss"},
+    {"isim": "NORMAL DALGA",   "aciklama": "",                                  "renk": (180, 255, 180), "efekt": None},
+]
 
 # Oyuncu & Sistemler
 OYUNCU_HIZ            = 210
@@ -143,6 +166,8 @@ YUKSELTMELER = {
     "kalkan": {"isim": "Kalkan",      "emoji": "🛡️",  "aciklama": "+40 Max Kalkan",     "fiyat": 500,  "max_seviye": 10},
     "zirh":   {"isim": "Zırh",        "emoji": "🔰",  "aciklama": "-%12 Alınan Hasar",  "fiyat": 700,  "max_seviye": 5},
     "mermi":  {"isim": "Geniş Şarjör","emoji": "📦",  "aciklama": "+%20 Cephane",       "fiyat": 650,  "max_seviye": 5},
+    "ult_cd": {"isim": "Hızlı Ulti",  "emoji": "⚡",  "aciklama": "-2s Ulti Bekleme",   "fiyat": 800,  "max_seviye": 5},
+    "combo":  {"isim": "Uzun Combo",  "emoji": "🔥",  "aciklama": "+0.5s Combo Süresi", "fiyat": 550,  "max_seviye": 5},
 }
 
 DURBUNLER = {

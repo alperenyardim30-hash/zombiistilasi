@@ -23,6 +23,8 @@ from ayarlar import (
     YUKSEKLIK,
 )
 
+DURUM_PERK = "perk"
+
 
 def _fare_durumu_ayarla(aktif_oyun: bool) -> None:
     """Aktif oyunda imleci gizler, menülerde görünür yapar."""
@@ -96,9 +98,7 @@ def main():
                     elif event.key == pygame.K_b:
                         durum = DURUM_SHOP
                         _fare_durumu_ayarla(aktif_oyun=False)
-                    elif event.key == pygame.K_3:
-                        oyun_ekrani.toggle_3d_mode()
-                    elif event.key == pygame.K_m and not oyun_ekrani.is_3d:
+                    elif event.key == pygame.K_m:
                         oyun_ekrani.harita_degistir()
                     elif pygame.K_1 <= event.key <= pygame.K_9:
                         idx = event.key - pygame.K_1
@@ -125,16 +125,38 @@ def main():
             elif durum == DURUM_SHOP:
                 if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
                     durum = DURUM_OYUN
-                    if oyun_ekrani.is_3d:
-                        _fare_durumu_ayarla(aktif_oyun=True)
+                    _fare_durumu_ayarla(aktif_oyun=False)
                 
                 sonuc = shop.tik_isle(event, oyun_ekrani.oyuncu, oyun_ekrani.puan_sis)
                 if sonuc == "devam":
-                    oyun_ekrani.oyuncu.mermileri_fulle() # Yeni dalgada mermi dolar
+                    oyun_ekrani.oyuncu.mermileri_fulle()
                     oyun_ekrani.dalga_sis.yeni_dalga_hazirla()
+                    oyun_ekrani.gorev_sis.yeni_gorev_sec()
+                    # Her 3 dalgada Perk — seçim oyun ekranında overlay olarak açılır
+                    if oyun_ekrani.dalga_sis.dalga_no > 0 and oyun_ekrani.dalga_sis.dalga_no % 3 == 0:
+                        oyun_ekrani.perk_sis.perk_sec_hazirla()
                     durum = DURUM_OYUN
-                    if oyun_ekrani.is_3d:
-                        _fare_durumu_ayarla(aktif_oyun=True)
+                    _fare_durumu_ayarla(aktif_oyun=False)
+
+            # Perk seçimi hem klavye hem fare tıklamasıyla
+            if durum == DURUM_OYUN and oyun_ekrani.perk_sis.secim_bekliyor:
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_1: oyun_ekrani.perk_sis.perk_sec(0)
+                    elif event.key == pygame.K_2: oyun_ekrani.perk_sis.perk_sec(1)
+                    elif event.key == pygame.K_3: oyun_ekrani.perk_sis.perk_sec(2)
+                elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    # Hangi karta tıklandı?
+                    p = oyun_ekrani.perk_sis
+                    kart_gen, kart_yuk, bosluk = 280, 220, 40
+                    n = len(p.secenekler)
+                    toplam = n * (kart_gen + bosluk) - bosluk
+                    sx = GENISLIK // 2 - toplam // 2
+                    sy = YUKSEKLIK // 2 - kart_yuk // 2
+                    for i in range(n):
+                        kx, ky = sx + i * (kart_gen + bosluk), sy
+                        if pygame.Rect(kx, ky, kart_gen, kart_yuk).collidepoint(event.pos):
+                            p.perk_sec(i)
+                            break
 
             elif durum == DURUM_BITTI:
                 sonuc = oyun_bitti.tik_isle(event)
@@ -163,6 +185,7 @@ def main():
             if oyun_ekrani.oyuncu_oldu_mu:
                 oyun_bitti.ayarla(oyun_ekrani.son_puan, oyun_ekrani.dalga_no, oyun_ekrani.yuksek_skorlar)
                 durum = DURUM_BITTI
+                _fare_durumu_ayarla(aktif_oyun=False)
             elif oyun_ekrani.dalga_bitti_mi:
                 durum = DURUM_SHOP
                 _fare_durumu_ayarla(aktif_oyun=False)

@@ -1,10 +1,11 @@
 # ============================================================
 #  varliklar/zombi.py — Element Efektleri (Yanma, Donma, Şok) ve Gölgeler
 # ============================================================
-import pygame
 import math
 import random
-from ayarlar import ZOMBI_TIPLER, SIYAH
+import pygame
+import ayarlar
+from ayarlar import ZOMBI_TIPLER, SIYAH, ZAFIYET_TABLOSU
 from varliklar.drop import Drop
 
 class Zombi(pygame.sprite.Sprite):
@@ -16,9 +17,9 @@ class Zombi(pygame.sprite.Sprite):
         v = ZOMBI_TIPLER[tip]
         self.baz_hiz = float(v["hiz"])
         self.hiz = self.baz_hiz
-        self.can = float(v["can"])
-        self.max_can = float(v["can"])
-        self.hasar = v["hasar"]
+        self.can = float(v["can"]) * ayarlar.ZORLUK_CARPANI
+        self.max_can = float(v["can"]) * ayarlar.ZORLUK_CARPANI
+        self.hasar = v["hasar"] * ayarlar.ZORLUK_CARPANI
         self.skor = v["skor"]
         self.para = v["para"]
         self.yari_cap = v["r"]
@@ -34,6 +35,10 @@ class Zombi(pygame.sprite.Sprite):
         self.donma_sayac = 0.0
         self.zehir_hasar_sayac = 0.0
         self.sok_sayac = 0.0
+        
+        # Boss giriş animasyonu
+        self.spawn_sayac = 0.8 if tip == "boss" else 0.0  # saniye
+        self.spawn_max   = 0.8
 
         self._image_olustur()
         self.rect = self.image.get_rect(center=(int(self.x), int(self.y)))
@@ -86,20 +91,31 @@ class Zombi(pygame.sprite.Sprite):
         if self.zehir_hasar_sayac > 0:
             self.zehir_hasar_sayac -= dt
             self.can -= 25 * dt # Saniyede 25 zehir hasarı
-            self.hiz = self.baz_hiz * 0.8
-            
-        if self.donma_sayac > 0:
-            self.donma_sayac -= dt
-            self.hiz = self.baz_hiz * 0.4
-        elif self.zehir_hasar_sayac <= 0:
-            self.hiz = self.baz_hiz
             
         if self.sok_sayac > 0:
             self.sok_sayac -= dt
             self.hiz = 0.0
+        elif self.donma_sayac > 0:
+            self.donma_sayac -= dt
+            self.hiz = self.baz_hiz * 0.4
+        elif self.zehir_hasar_sayac > 0:
+            self.hiz = self.baz_hiz * 0.8
+        else:
+            self.hiz = self.baz_hiz
 
     def update(self, dt, ox, oy):
         self.durum_guncelle(dt)
+        
+        # Boss giriş animasyonu — hareket etme, sadece büyü
+        if self.spawn_sayac > 0:
+            self.spawn_sayac -= dt
+            ilerleme = 1.0 - (self.spawn_sayac / self.spawn_max)  # 0.0 → 1.0
+            r_guncel = max(4, int(self.yari_cap * ilerleme))
+            boyut = r_guncel * 2 + 10
+            scaled = pygame.transform.scale(self._base_image, (boyut, boyut))
+            self.image = scaled
+            self.rect = scaled.get_rect(center=(int(self.x), int(self.y)))
+            return  # Henüz hareket etme
         
         if self.hiz > 0:
             dx = ox - self.x
@@ -141,10 +157,26 @@ class Zombi(pygame.sprite.Sprite):
             self.zehir_sayac += dt
 
     def mermi_carpisma(self, mermi):
+        """Merminin isabet edip etmediğini kontrol eder. 
+        Döndürür: (oldu, zafiyet_mesaji)
+          zafiyet_mesaji: 'ZAYIF NOKTA!' | 'DİRENÇLİ' | None
+        """
         mc, mr = mermi.get_circle()
         if math.hypot(mc[0]-self.x, mc[1]-self.y) < (self.yari_cap + mr):
-            self.can -= mermi.hasar
+            # Zafiyet çarpanı hesapla
+            zafiyet = ZAFIYET_TABLOSU.get(self.tip, {})
+            carpan = zafiyet.get(mermi.efekt, 1.0) if mermi.efekt != "yok" else 1.0
+            
+            gercek_hasar = mermi.hasar * carpan
+            self.can -= gercek_hasar
             self.hit_sayac = 0.10
+            
+            # Zafiyet mesajı
+            zafiyet_msg = None
+            if carpan >= 1.5:
+                zafiyet_msg = "ZAYIF NOKTA!"
+            elif carpan <= 0.5:
+                zafiyet_msg = "DİRENÇLİ"
             
             # Efekt Uygulama
             if mermi.efekt == "yanma": self.yanma_sayac = 3.0
@@ -153,9 +185,11 @@ class Zombi(pygame.sprite.Sprite):
             elif mermi.efekt == "sok": self.sok_sayac = 1.0
             
             if mermi.tip != "delici":
+                if mermi.tip in ("roket", "delici_patlayan", "seken_bomba"):
+                    mermi.patlama_hazir = True
                 mermi.kill()
-            return self.can <= 0
-        return False
+            return self.can <= 0, zafiyet_msg, int(gercek_hasar)
+        return False, None, 0
 
     def oyuncuya_yakin_mi(self, ox, oy):
         return math.hypot(ox-self.x, oy-self.y) < (self.yari_cap + 18)

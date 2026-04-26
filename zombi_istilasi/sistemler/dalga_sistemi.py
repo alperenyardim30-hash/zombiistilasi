@@ -1,9 +1,10 @@
 # ============================================================
-#  sistemler/dalga_sistemi.py — 6 Zombi Tipi + Daha Zor Dalgalar
+#  sistemler/dalga_sistemi.py — 6 Zombi Tipi + Daha Zor Dalgalar + Dalga Modları
 # ============================================================
 import random
-from ayarlar import DALGA_ARASI_SURE
 from varliklar.zombi import Zombi
+import ayarlar
+from ayarlar import DALGA_MODLARI
 
 
 class DalgaSistemi:
@@ -17,10 +18,10 @@ class DalgaSistemi:
         self.dalga_bitti = False
         self.bildirim_sayac = 0.0
         self.bildirim_metni = ""
+        self.aktif_mod = None  # Görev 3: Mevcut dalga modu
 
     def _dalga_olustur(self, dalga_no):
         liste = []
-        # Baz sayılar
         normal = 4 + dalga_no * 2
         hizli = max(0, dalga_no * 2 - 2)
         kosucu = max(0, dalga_no - 3) * 2
@@ -39,8 +40,26 @@ class DalgaSistemi:
             liste += ["boss"] * boss_sayisi
             liste += ["patlayan"] * boss_sayisi * 2
             
+        # BOSS KORUMALARI modu — mini bosslar ekle
+        if self.aktif_mod and self.aktif_mod.get("efekt") == "mini_boss":
+            liste += ["boss"] * 2
+            
         random.shuffle(liste)
         return liste
+
+    def _mod_uygula(self, zombi):
+        """Aktif mod efektini yeni spawn olan zombiye uygular."""
+        if not self.aktif_mod:
+            return
+        efekt = self.aktif_mod.get("efekt")
+        if efekt == "hiz":
+            zombi.baz_hiz *= 1.5
+            zombi.hiz = zombi.baz_hiz
+        elif efekt == "zirh":
+            zombi.can *= 1.75
+            zombi.max_can *= 1.75
+        elif efekt == "para":
+            zombi.para *= 2
 
     def guncelle(self, dt, ekran_w, ekran_h):
         if self.dalga_bitti:
@@ -54,7 +73,9 @@ class DalgaSistemi:
             self.spawn_sayac -= dt
             if self.spawn_sayac <= 0:
                 tip = self.spawn_listesi.pop(0)
-                self.zombiler.add(Zombi.rastgele_dogur(ekran_w, ekran_h, tip))
+                yeni_z = Zombi.rastgele_dogur(ekran_w, ekran_h, tip)
+                self._mod_uygula(yeni_z)
+                self.zombiler.add(yeni_z)
                 self.spawn_sayac = self.spawn_aralik
         elif len(self.zombiler) == 0:
             self.dalga_aktif = False
@@ -67,18 +88,24 @@ class DalgaSistemi:
 
     def _yeni_dalga_baslat(self, ekran_w, ekran_h):
         self.dalga_no += 1
+        ayarlar.ZORLUK_CARPANI = 1.0 + (self.dalga_no * 0.1)
+        
+        # Boss dalgasında mod yok
+        if self.dalga_no % 5 == 0:
+            self.aktif_mod = None
+            self.bildirim_metni = f"DALGA {self.dalga_no} — BOSS DALGASI! 💀"
+        else:
+            self.aktif_mod = random.choice(DALGA_MODLARI)
+            mod_isim = self.aktif_mod["isim"]
+            mod_acik = self.aktif_mod["aciklama"]
+            self.bildirim_metni = f"DALGA {self.dalga_no}  ⚡ {mod_isim}" + (f"\n{mod_acik}" if mod_acik else "")
+        
         self.dalga_aktif = True
         self.dalga_bitti = False
         self.spawn_listesi = self._dalga_olustur(self.dalga_no)
         self.spawn_sayac = 0.5
-        # Spawn aralığını düşür (daha hızlı gelsinler)
         self.spawn_aralik = max(0.15, 0.7 - self.dalga_no * 0.05)
-        
-        if self.dalga_no % 5 == 0:
-            self.bildirim_metni = f"DALGA {self.dalga_no} — BOSS DALGASI! 💀"
-        else:
-            self.bildirim_metni = f"DALGA {self.dalga_no}"
-        self.bildirim_sayac = 2.5
+        self.bildirim_sayac = 3.0
 
     def yeni_dalga_hazirla(self):
         self.dalga_bitti = False
@@ -88,3 +115,4 @@ class DalgaSistemi:
         if self.bildirim_sayac > 0:
             return self.bildirim_metni, self.bildirim_sayac
         return None, 0
+

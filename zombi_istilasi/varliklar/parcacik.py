@@ -5,6 +5,8 @@ import pygame
 import math
 import random
 
+_parcacik_cache = {}
+
 
 class Parcacik:
     """Kan/ateş parçacığı."""
@@ -31,10 +33,14 @@ class Parcacik:
         return self.omur > 0
 
     def ciz(self, ekran):
-        alpha = int(255 * (self.omur / self.max_omur))
-        surf = pygame.Surface((self.r * 2, self.r * 2), pygame.SRCALPHA)
-        pygame.draw.circle(surf, (*self.renk, alpha), (self.r, self.r), self.r)
-        ekran.blit(surf, (int(self.x) - self.r, int(self.y) - self.r))
+        alpha = max(0, min(255, int(255 * (self.omur / self.max_omur))))
+        alpha = (alpha // 10) * 10
+        key = (self.r, self.renk, alpha)
+        if key not in _parcacik_cache:
+            surf = pygame.Surface((self.r * 2, self.r * 2), pygame.SRCALPHA)
+            pygame.draw.circle(surf, (*self.renk, alpha), (self.r, self.r), self.r)
+            _parcacik_cache[key] = surf
+        ekran.blit(_parcacik_cache[key], (int(self.x) - self.r, int(self.y) - self.r))
 
 
 class HarasarSayisi:

@@ -13,8 +13,7 @@ from ayarlar import (
 )
 from varliklar.mermi import Mermi
 from sistemler.ses_sistemi import ses_sis
-
-ZORLUK_CARPANI = 1.0
+import ayarlar
 
 class Oyuncu(pygame.sprite.Sprite):
     def __init__(self, x, y):
@@ -39,6 +38,7 @@ class Oyuncu(pygame.sprite.Sprite):
         self.hasar_sayac = 0.0
         self.hasarli_sayac = 0.0
         self.oldu = False
+        self._son_hareket = False
 
         self.envanter = ["tabanca"]
         self.aktif_silah = "tabanca"
@@ -48,7 +48,7 @@ class Oyuncu(pygame.sprite.Sprite):
             "can": 0, "stamina": 0, "hiz": 0, "hasar": 0, 
             "kalkan": 0, "zirh": 0, "ult_cd": 0, "combo": 0, "mermi": 0
         }
-        self.ult_bekleme = 0.0
+        self.ult_bekleme = self.ult_max_cd
         
         self.durbunler = ["red_dot"] # Varsayılan olarak Red Dot olsun
         self.aktif_durbun = "red_dot"
@@ -118,7 +118,9 @@ class Oyuncu(pygame.sprite.Sprite):
     @property
     def hasar_carpani(self): return 1.0 + self.yukseltmeler["hasar"] * 0.30
     @property
-    def zirh_carpani(self): return max(0.2, 1.0 - self.yukseltmeler["zirh"] * 0.12) * ZORLUK_CARPANI
+    def max_can_degeri(self): return self.max_can + self.yukseltmeler["can"] * 40
+    @property
+    def zirh_carpani(self): return max(0.2, 1.0 - self.yukseltmeler["zirh"] * 0.12) * ayarlar.ZORLUK_CARPANI
     @property
     def max_kalkan_degeri(self): return self.max_kalkan + self.yukseltmeler["kalkan"] * 40
     @property
