@@ -31,6 +31,10 @@ _DOSYA_ESLESMESI = {
     "ayak_sesi":     "ayak_sesi.mp3",
     "hasar":         "oyuncu_hasar.mp3",
     "oyuncu_hasar":  "oyuncu_hasar.mp3",
+    "oyuncu_hasar1": "oyuncu_hasar1.mp3",
+    "oyuncu_hasar2": "oyuncu_hasar2.mp3",
+    "oyuncu_hasar3": "oyuncu_hasar3.mp3",
+    "oyuncu_hasar4": "oyuncu_hasar4.mp3",
     "olum":          "oyuncu_olum.mp3",
     "oyuncu_olum":   "oyuncu_olum.mp3",
     "reload_hafif":  "reload_hafif.mp3",
@@ -189,11 +193,24 @@ class SesSistemi:
         """Bir efekti tek seferlik oynat."""
         if not self.aktif:
             return
+            
+        # Oyuncu hasar sesi ust uste binmesini onleme
+        if isim.startswith("oyuncu_hasar"):
+            su_an = pygame.time.get_ticks()
+            if getattr(self, "_son_hasar_sesi", 0) + 400 > su_an:
+                return
+            self._son_hasar_sesi = su_an
+
         ses = self.sesler.get(isim)
         if ses:
             if volume is not None:
                 ses.set_volume(max(0.0, min(1.0, volume)))
             ses.play()
+
+    def oyuncu_hasar_sesi_oynat(self):
+        """4 farkli bagirma sesinden rastgele birini oynatir."""
+        idx = random.randint(1, 4)
+        self.oynat(f"oyuncu_hasar{idx}")
 
     def ates_sesi_oynat(self, silah_kategori):
         """Silah kategorisine göre doğru ateş sesini çalar."""

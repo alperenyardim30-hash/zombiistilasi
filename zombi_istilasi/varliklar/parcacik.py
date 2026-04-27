@@ -63,14 +63,34 @@ class HarasarSayisi:
 
     def ciz(self, ekran, font_kucuk, font_orta):
         alpha = int(255 * (self.omur / self.max_omur))
+        # Görev 12 — Hasar sayıları büyüklük farkı
+        try:
+            deger = float(self.metin)
+            if deger > 200:
+                self.buyuk = True
+            if deger > 500:
+                # Kırmızı-Sarı gradient yerine şimdilik renk değiştir
+                self.renk = (255, random.randint(100, 200), 0)
+        except ValueError:
+            pass
+            
         font = font_orta if self.buyuk else font_kucuk
         surf = font.render(self.metin, True, self.renk)
         surf.set_alpha(alpha)
         ekran.blit(surf, (int(self.x) - surf.get_width() // 2, int(self.y)))
 
 
-def kan_parcaciklari(x, y, n=12, renk=(180, 20, 20)):
+def kan_parcaciklari(x, y, n=12, renk=(180, 20, 20), tip="normal"):
     """Zombi öldüğünde kan parçacıkları üretir."""
+    if tip == "parca":
+        parcalar = []
+        for _ in range(n):
+            hiz = random.uniform(60, 180)
+            aci = random.uniform(0, 360)
+            p = Parcacik(x, y, renk, hiz=hiz, omur=random.uniform(0.4, 0.9))
+            p.r = random.randint(3, 7)
+            parcalar.append(p)
+        return parcalar
     return [Parcacik(x, y, renk, hiz=130, omur=random.uniform(0.4, 0.8)) for _ in range(n)]
 
 

@@ -39,6 +39,8 @@ class Oyuncu(pygame.sprite.Sprite):
         self.hasarli_sayac = 0.0
         self.oldu = False
         self._son_hareket = False
+        self.god_mode = False
+        self._ult_flash = 0.0
 
         self.envanter = ["tabanca"]
         self.aktif_silah = "tabanca"
@@ -168,6 +170,13 @@ class Oyuncu(pygame.sprite.Sprite):
         self._silah_sprite_guncelle()
 
     def update(self, dt, tuslar, fare_pos, mermiler, ekran_w, ekran_h, serbest_bakis=False):
+        # Adrenalin perki — hasar alınca 3 saniye hız bonusu
+        if getattr(self, '_adrenalin_sayac', 0) > 0:
+            self._adrenalin_sayac -= dt
+            hiz_bonus = 1.2
+        else:
+            hiz_bonus = 1.0
+
         sprint = tuslar.get("sprint", False)
         nisan = tuslar.get("nisan", False)
         
@@ -206,9 +215,9 @@ class Oyuncu(pygame.sprite.Sprite):
         
         # 3D modunda hareket oyuncunun baktığı yöne göre olmalı!
         if serbest_bakis:
-            self._hareket_3d(dt, tuslar, ekran_w, ekran_h, hiz_carpani)
+            self._hareket_3d(dt, tuslar, ekran_w, ekran_h, hiz_carpani * hiz_bonus)
         else:
-            self._hareket(dt, tuslar, ekran_w, ekran_h, hiz_carpani)
+            self._hareket(dt, tuslar, ekran_w, ekran_h, hiz_carpani * hiz_bonus)
             
         self._don(fare_pos, serbest_bakis)
         
@@ -244,6 +253,23 @@ class Oyuncu(pygame.sprite.Sprite):
         self.x += dx * v * dt
         self.y += dy * v * dt
         self._son_hareket = (dx != 0 or dy != 0)
+        
+        sprint_aktif = tuslar.get("sprint", False) and self.stamina > 0 and not self.yoruldu_mu
+        self._ayak_sayac = getattr(self, '_ayak_sayac', 0) - dt
+        if (dx != 0 or dy != 0) and self._ayak_sayac <= 0:
+            from sistemler.ses_sistemi import ses_sis
+            ses_sis.oynat("ayak_sesi", volume=0.3)
+            self._ayak_sayac = 0.35 if not sprint_aktif else 0.2
+            
+        if sprint_aktif and (dx != 0 or dy != 0):
+            self._iz_sayac = getattr(self, '_iz_sayac', 0) + dt
+            if self._iz_sayac >= 0.06:
+                self._iz_sayac = 0
+                self._iz_konumlar = getattr(self, '_iz_konumlar', [])
+                self._iz_konumlar.append((self.x, self.y, pygame.time.get_ticks()))
+                if len(self._iz_konumlar) > 8:
+                    self._iz_konumlar.pop(0)
+                    
         self.x = max(self.yari_cap, min(ekran_w - self.yari_cap, self.x))
         self.y = max(self.yari_cap, min(ekran_h - self.yari_cap, self.y))
 
@@ -384,6 +410,9 @@ class Oyuncu(pygame.sprite.Sprite):
                 })
             else:
                 m = Mermi(namlu_x, namlu_y, aci_final, veri, self.hasar_carpani)
+                if perk_sis and 'bumerang' in perk_sis.aktif_perkler:
+                    m.bumerang = True
+                    m.dondu = False
                 mermiler.add(m)
             
         self.ates_sayac = veri["ates_hizi"]
@@ -393,28 +422,33 @@ class Oyuncu(pygame.sprite.Sprite):
         self.recoil = min(self.recoil, 45.0) # Maksimum recoil sınırı
         
         # Silah sesini tipine göre seç (Profesyonel Mapping)
-        ak = self.aktif_silah
-        if ak in ["smg","vector","pp90","bizon","minigun","vulcan","chaingun"]:
-            ses_anahtar = "ates_smg"
-        elif ak in ["ak47","m4a1","aug","scar","famas","an94","galil"]:
-            ses_anahtar = "ates_ak"
-        elif ak in ["shotgun","aa12","ksg","spas","striker","saiga"]:
-            ses_anahtar = "ates_pom"
-        elif ak in ["sniper","awm","barrett","intervention","cheytac","rail","nemesis"]:
-            ses_anahtar = "ates_sni"
-        elif ak in ["lazer","lazer_mk2","ion","taser_xl","phaser","plazma","plazma_mk2","void","antimatter","widowmaker","zeus","the_end"]:
-            ses_anahtar = "ates_laz"
-        elif ak in ["alev","napalm","drakon"]:
-            ses_anahtar = "ates_ale"
-        elif ak in ["bomba","roket","thermobarik","thor","orbital","apocalypse","mjolnir"]:
-            ses_anahtar = "ates_pat"
-        else:
-            ses_anahtar = "ates" # Tabanca ve varsayılan
-        
+        gorsel_tip = veri.get("gorsel_tip", "normal")
+        ses_map = {
+            "raycast": "ates_laz",
+            "alev_koni": "ates_ale",
+            "roket_fuze": "ates_pat",
+            "pellet": "ates_pom",
+            "delici_serit": "ates_sni",
+            "iyon_top": "ates_laz",
+            "void_dalgasi": "ates_laz",
+            "efsane_isin": "ates_laz",
+            "the_end_isin": "ates_pat",
+            "elektrik_ark": "ates_laz",
+            "plazma_top": "ates_laz",
+        }
+        ses_anahtar = ses_map.get(gorsel_tip, "ates_ak" if "ak" in self.aktif_silah else "ates_smg" if veri["ates_hizi"] < 0.1 else "ates")
         ses_sis.oynat(ses_anahtar)
+        
+        mevcut = self.mermiler.get(self.aktif_silah, -1)
+        kapasite = self._silah_max_mermi(self.aktif_silah)
+        if kapasite != -1 and mevcut == 0:
+            ses_sis.oynat("silah_bos")
+        elif kapasite != -1 and mevcut <= int(kapasite * 0.15) and mevcut > 0:
+            ses_sis.oynat("silah_bos", volume=0.3)
 
     def _ultimate_kullan(self, mermiler):
         self.ult_bekleme = self.ult_max_cd
+        self._ult_flash = 0.3
         baz = SILAHLAR.get("roket", SILAHLAR["tabanca"]).copy()
         baz["mermi_hizi"] = 700
         baz["tip"] = "delici_patlayan"
@@ -441,9 +475,12 @@ class Oyuncu(pygame.sprite.Sprite):
             else:
                 gercek -= self.kalkan
                 self.kalkan = 0
+                if hasattr(self, '_perk_sis_ref') and self._perk_sis_ref:
+                    if 'kalkan_pat' in self._perk_sis_ref.aktif_perkler:
+                        self._kalkan_patlama_flag = True
         if gercek > 0:
             self.can -= gercek
-            ses_sis.oynat("hasar")
+            ses_sis.oyuncu_hasar_sesi_oynat()
             
         self.hasarli_sayac = OYUNCU_HASAR_FLASH
         self.kalkan_yenilenme_sayaci = OYUNCU_KALKAN_GECIKME
@@ -468,13 +505,18 @@ class Oyuncu(pygame.sprite.Sprite):
     def flash_ciz(self, ekran):
         if self.hasarli_sayac > 0:
             alpha = int(180 * (self.hasarli_sayac / OYUNCU_HASAR_FLASH))
-            flash = pygame.Surface(ekran.get_size(), pygame.SRCALPHA)
-            flash.fill((255, 0, 0, alpha) if self.kalkan <= 0 else (100, 150, 255, alpha))
-            ekran.blit(flash, (0, 0))
+            if not hasattr(self, "_flash_surf_1x1"):
+                self._flash_surf_1x1 = pygame.Surface((1, 1), pygame.SRCALPHA)
+            renk = (255, 0, 0, alpha) if self.kalkan <= 0 else (100, 150, 255, alpha)
+            self._flash_surf_1x1.set_at((0, 0), renk)
+            scaled_flash = pygame.transform.scale(self._flash_surf_1x1, ekran.get_size())
+            ekran.blit(scaled_flash, (0, 0))
             
-        oran = self.can / (self.max_can + self.yukseltmeler["can"]*40)
+        oran = self.can / self.max_can_degeri
         if oran < 0.35:
             alpha = int(255 * (1.0 - oran/0.35)) * abs(math.sin(pygame.time.get_ticks() / 150))
-            vignette = pygame.Surface(ekran.get_size(), pygame.SRCALPHA)
-            pygame.draw.rect(vignette, (255, 0, 0, int(alpha*0.4)), vignette.get_rect(), 40)
-            ekran.blit(vignette, (0, 0))
+            if not hasattr(self, "_vignette_surf") or self._vignette_surf.get_size() != ekran.get_size():
+                self._vignette_surf = pygame.Surface(ekran.get_size(), pygame.SRCALPHA)
+                pygame.draw.rect(self._vignette_surf, (255, 0, 0, 255), self._vignette_surf.get_rect(), 40)
+            self._vignette_surf.set_alpha(int(alpha*0.4))
+            ekran.blit(self._vignette_surf, (0, 0))

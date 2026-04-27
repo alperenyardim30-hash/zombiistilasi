@@ -134,14 +134,21 @@ class Zombi(pygame.sprite.Sprite):
             return  # Henüz hareket etme
         
         if self.hiz > 0:
-            dx = ox - self.x
-            dy = oy - self.y
-            uzak = math.hypot(dx, dy)
-            if uzak > 0:
-                self.vx = (dx / uzak) * self.hiz
-                self.vy = (dy / uzak) * self.hiz
-            self.x += self.vx * dt
-            self.y += self.vy * dt
+            if self.tip == "kosucu":
+                self._zigzag_sayac = getattr(self, '_zigzag_sayac', 0) + dt
+                sapma = math.sin(self._zigzag_sayac * 8) * 80
+                aci = math.atan2(oy - self.y, ox - self.x)
+                self.x += math.cos(aci + sapma * 0.02) * self.hiz * dt
+                self.y += math.sin(aci + sapma * 0.02) * self.hiz * dt
+            else:
+                dx = ox - self.x
+                dy = oy - self.y
+                uzak = math.hypot(dx, dy)
+                if uzak > 0:
+                    self.vx = (dx / uzak) * self.hiz
+                    self.vy = (dy / uzak) * self.hiz
+                self.x += self.vx * dt
+                self.y += self.vy * dt
             
         self.rect.center = (int(self.x), int(self.y))
         
@@ -191,6 +198,7 @@ class Zombi(pygame.sprite.Sprite):
             zafiyet_msg = "DİRENÇLİ"
         
         # Efekt Uygulama
+        self._son_isabetefekti = mermi.efekt
         if mermi.efekt == "yanma":  self.yanma_sayac = 3.0
         elif mermi.efekt == "donma":  self.donma_sayac = 2.0
         elif mermi.efekt == "zehir":  self.zehir_hasar_sayac = 4.0

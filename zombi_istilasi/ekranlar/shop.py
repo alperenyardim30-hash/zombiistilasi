@@ -190,6 +190,22 @@ class Shop:
             ekran.blit(ft, (bx + 4, alt_y + 28))
             bx += 120
 
+        # Görev 25 — Shop: dürbün kartları çiz
+        from ayarlar import DURBUNLER
+        bx_d = 15 + len(YUKSELTMELER) * 120
+        for d_key, d_veri in DURBUNLER.items():
+            sahip = d_key in oyuncu.durbunler
+            aktif = oyuncu.aktif_durbun == d_key
+            renk = YESIL if aktif else (CAMGOBEGI if sahip else (160, 160, 160))
+            kart = pygame.Rect(bx_d, alt_y + 4, 100, 60)
+            pygame.draw.rect(ekran, (22, 26, 34), kart, border_radius=6)
+            pygame.draw.rect(ekran, renk, kart, 1, border_radius=6)
+            t = self.font_kucuk.render(d_veri["isim"], True, renk)
+            ekran.blit(t, (bx_d + 4, alt_y + 10))
+            ft = self.font_kucuk.render(f"{d_veri['fiyat']}$" if not sahip else "[AKTİF]" if aktif else "[SAHIP]", True, ALTIN)
+            ekran.blit(ft, (bx_d + 4, alt_y + 30))
+            bx_d += 105
+
     def _ciz_devam_butonu(self, ekran):
         bw, bh = 260, 44
         bx = GENISLIK // 2 - bw // 2
@@ -261,6 +277,16 @@ class Shop:
                     self._yukseltme_al(key, oyuncu, puan_sis)
                     return None
                 bx += 120
+            
+            # Dürbün satın alma
+            from ayarlar import DURBUNLER
+            bx2 = 15 + len(YUKSELTMELER) * 120
+            for d_key, d_veri in DURBUNLER.items():
+                r = pygame.Rect(bx2, alt_y, 100, 50)
+                if r.collidepoint(fx, fy):
+                    self._durbun_al(d_key, oyuncu, puan_sis)
+                    return None
+                bx2 += 105
 
         return None
 
@@ -296,3 +322,20 @@ class Shop:
         else:
             ses_sis.oynat("ui_click")
             self._mesaj(f"Yeterli para yok! ({fiyat}$ gerekli)")
+
+    def _durbun_al(self, key, oyuncu, puan_sis):
+        from ayarlar import DURBUNLER
+        if key in oyuncu.durbunler:
+            oyuncu.aktif_durbun = key
+            ses_sis.oynat("ui_click")
+            self._mesaj(f"{DURBUNLER[key]['isim']} takıldı!")
+            return
+        veri = DURBUNLER[key]
+        if puan_sis.harca(veri["fiyat"]):
+            oyuncu.durbunler.append(key)
+            oyuncu.aktif_durbun = key
+            ses_sis.oynat("ui_satin_al")
+            self._mesaj(f"{veri['isim']} takıldı!")
+        else:
+            ses_sis.oynat("ui_click")
+            self._mesaj(f"Yeterli para yok! ({veri['fiyat']}$ gerekli)")

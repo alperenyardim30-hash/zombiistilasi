@@ -22,6 +22,8 @@ class Mermi(pygame.sprite.Sprite):
         self.renk = veri["renk"]
         self.patlama_r = veri.get("patlama_r", 0)
         self.patlama_hazir = False
+        self.bumerang = False
+        self.dondu = False
         self.omur = 2.0
         self.vurulan_zombiler = set()
 
@@ -196,9 +198,14 @@ class Mermi(pygame.sprite.Sprite):
         if (self.x < -100 or self.x > ekran_w + 100 or
                 self.y < -100 or self.y > ekran_h + 100 or
                 self.omur <= 0):
-            if self.tip in ("roket", "delici_patlayan"):
-                self.patlama_hazir = True
-            self.kill()
+            if getattr(self, "bumerang", False) and not getattr(self, "dondu", False):
+                self.vx *= -1
+                self.vy *= -1
+                self.dondu = True
+            else:
+                if self.tip in ("roket", "delici_patlayan"):
+                    self.patlama_hazir = True
+                self.kill()
 
     # ----------------------------------------------------------
     def get_circle(self):

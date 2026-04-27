@@ -29,6 +29,11 @@ class OyunEkrani:
         self.font_sayi_b = pygame.font.SysFont("Impact", 32)
         self.font_mermi  = pygame.font.SysFont("Impact", 56)
         
+        self._combo_fontlar = {
+            i: pygame.font.SysFont("Impact", i, bold=True)
+            for i in range(46, 90, 4)
+        }
+        
         # Grafik iyileştirme: Zemin Detayları — PRE-RENDER edilmiş Surface
         self._zemin_verileri = []
         for _ in range(300):
@@ -47,6 +52,10 @@ class OyunEkrani:
             a = int(155 * (1 - dr/torch_r) ** 2)
             pygame.draw.circle(self._torch_surface, (0, 0, 0, 155 - a), (torch_r, torch_r), dr)
         self._torch_r = torch_r
+        
+        self._karanlik_overlay = pygame.Surface((GENISLIK, YUKSEKLIK), pygame.SRCALPHA)
+        self._karanlik_overlay.fill((0, 0, 0, 155))
+        self._isin_surface = pygame.Surface((GENISLIK, YUKSEKLIK), pygame.SRCALPHA)
 
         self.haritalar = [
             {"isim": "Sehir Asfalti", "zemin": (10, 12, 16), "cizgi": (22, 28, 36), "karo": 80},
@@ -72,6 +81,17 @@ class OyunEkrani:
         self.puan_sis    = PuanSistemi()
         self.perk_sis    = PerkSistemi()
         self.gorev_sis   = GorevSistemi()
+        from sistemler.basarim_sistemi import BasarimSistemi
+        self.basarim_sis = BasarimSistemi()
+        
+        self.istatistikler = {
+            "toplam_zombi": 0,
+            "toplam_atis": 0,
+            "toplam_hasar": 0,
+            "boss_olduruldu": 0,
+            "max_combo": 0,
+        }
+        self._harita_gecis = 0.0
         self.gorev_sis.yeni_gorev_sec()
         # Perk sistemi referansini oyuncuya bagla (ikiz_namlu, hasar_alindi vs)
         self.oyuncu._perk_sis_ref = self.perk_sis
@@ -88,14 +108,31 @@ class OyunEkrani:
 
     def harita_degistir(self):
         self.aktif_harita = (self.aktif_harita + 1) % len(self.haritalar)
+        self._harita_gecis = 0.4  # saniye
 
 
 
     def guncelle(self, dt, tuslar, fare_pos):
         if self.bitti: return
         
+        # Soğuk Kan perki — nişanda zaman yavaşlar
+        if 'soguk_kan' in self.perk_sis.aktif_perkler:
+            if pygame.mouse.get_pressed()[2]:  # sağ tık nişan
+                dt = dt * 0.45
+        
         self.son_fare_pos = fare_pos
+        onceki_ates = self.oyuncu.ates_sayac
         self.oyuncu.update(dt, tuslar, fare_pos, self.mermiler, GENISLIK, YUKSEKLIK, False)
+        if onceki_ates <= 0 and self.oyuncu.ates_sayac > 0:
+            self.istatistikler["toplam_atis"] += 1
+            
+        if self.puan_sis.combo > self.istatistikler["max_combo"]:
+            self.istatistikler["max_combo"] = self.puan_sis.combo
+            
+        if getattr(self.oyuncu, '_kalkan_patlama_flag', False):
+            self.oyuncu._kalkan_patlama_flag = False
+            self.patlamalar.append(Patlama(self.oyuncu.x, self.oyuncu.y, 150, hasar=80))
+            self.basarimlar.append(BasarimBildirimi("KALKAN PATLAMASI!", ""))
         self.mermiler.update(dt, GENISLIK, YUKSEKLIK)
         self.puan_sis.update(dt)
 
@@ -114,8 +151,8 @@ class OyunEkrani:
                 self.basarimlar.append(BasarimBildirimi("HİLE AKTİF", "5000 XP Eklendi!"))
                 self.hile_bekleme = 0.5
             elif keys[pygame.K_F3]:
-                self.oyuncu.can = getattr(self.oyuncu, "max_can", 100)
-                self.oyuncu.kalkan = getattr(self.oyuncu, "max_kalkan", 100)
+                self.oyuncu.can = getattr(self.oyuncu, "max_can_degeri", 100)
+                self.oyuncu.kalkan = getattr(self.oyuncu, "max_kalkan_degeri", 100)
                 self.oyuncu.ult_bekleme = 0
                 self.basarimlar.append(BasarimBildirimi("HİLE AKTİF", "Can, Kalkan ve Ulti Fullendi!"))
                 self.hile_bekleme = 0.5
@@ -229,6 +266,8 @@ class OyunEkrani:
                     if gercek_hasar <= 0:
                         continue
                     
+                    self.gorev_sis.isabet_bildir()
+                    
                     if m.tip == "delici":
                         # Sadece isabet eden zombiyi kaydet
                         if not hasattr(m, "vurulan_zombiler"): m.vurulan_zombiler = set()
@@ -264,8 +303,7 @@ class OyunEkrani:
                     gosterilen = int(p.hasar * self.oyuncu.hasar_carpani) if p.hasar > 0 else int(p.max_r * 1.5)
                     self.sayilar.append(HarasarSayisi(z.x, z.y, gosterilen, SARI, True))
                     self._zombi_oldu(z)
-            if p.bitti_mi:
-                self.patlamalar.remove(p)
+        self.patlamalar = [p for p in self.patlamalar if not p.bitti_mi]
 
         manyetik = self.perk_sis.drop_manyetik_mi()
         for d in list(self.droplar):
@@ -298,6 +336,22 @@ class OyunEkrani:
         if self.sarsinti > 0: self.sarsinti -= dt
         self.dalga_sis.guncelle(dt, GENISLIK, YUKSEKLIK)
         self.gorev_sis.guncelle(dt, self.puan_sis)
+        
+        bonus = self.basarim_sis.kontrol_et({
+            "dalga_no": self.dalga_sis.dalga_no,
+            "zombi_oldu_sayisi": self.istatistikler.get("toplam_zombi", 0),
+            "combo_max": self.istatistikler.get("max_combo", 0),
+            "boss_olduruldu": self.istatistikler.get("boss_olduruldu", 0) > 0,
+            "perk_sayisi": len(self.perk_sis.aktif_perkler),
+            "para": self.puan_sis.para,
+            "silah_sayisi": len(self.oyuncu.envanter)
+        })
+        for b in self.basarim_sis.yeni_al():
+            self.basarimlar.append(
+                BasarimBildirimi(f"🏆 {b['isim']}", f"+{b['skor_bonusu']} puan!")
+            )
+            ses_sis.oynat("ui_level_up")
+            self.puan_sis.puan += b['skor_bonusu']
 
     def _zombi_oldu(self, z, patlama_mi=False):
         if not z.alive(): return  # Cift olum guardi
@@ -309,8 +363,34 @@ class OyunEkrani:
         
         # ONCE kill() — tekrar _zombi_oldu'ya girmesini engeller
         z.kill()
+        
+        self.istatistikler["toplam_zombi"] += 1
+        if z.tip == "boss":
+            self.istatistikler["boss_olduruldu"] += 1
+            
+        if 'patlama' in self.perk_sis.aktif_perkler:
+            for komsu in list(self.zombiler):
+                if komsu is not z and math.hypot(komsu.x - z.x, komsu.y - z.y) < 120:
+                    komsu.can -= 60
+                    self.sayilar.append(HarasarSayisi(komsu.x, komsu.y, 60, (255, 140, 0)))
+                    if komsu.can <= 0:
+                        self._zombi_oldu(komsu)
+                        
+        mesafe = math.hypot(z.x - self.oyuncu.x, z.y - self.oyuncu.y)
+        self.gorev_sis.yakin_olum_bildir(mesafe)
                 
         self.parcaciklar.extend(kan_parcaciklari(z.x, z.y, 18))
+        
+        if z.tip == "boss":
+            self.parcaciklar.extend(kan_parcaciklari(z.x, z.y, 8, (80, 80, 80), tip="parca"))
+            ses_sis.oynat("ates_pat", volume=1.0)
+            ses_sis.oynat("ui_level_up", volume=0.8)
+            self.basarimlar.append(BasarimBildirimi("BOSS YENİLDİ! 💀", f"+{z.skor} SKOR"))
+            
+        if z.tip == "zehirli":
+            self.zehir_havuzlari.append([z.x, z.y, 40, 6.0, 6.0])
+            self.parcaciklar.extend(kan_parcaciklari(z.x, z.y, 12, (50, 255, 80)))
+            
         # Perk: vampir ve para_avcisi
         self.perk_sis.uygula_olum(self.oyuncu, z)
         # Görev: element ve patlama
@@ -417,25 +497,66 @@ class OyunEkrani:
         for p in self.parcaciklar: p.ciz(ekran)
 
         # Anlik isinlari (raycast beams) ciz
-        for isin in self.anlik_isinlar:
-            isin.ciz(ekran)
+        if self.anlik_isinlar:
+            self._isin_surface.fill((0, 0, 0, 0))
+            for isin in self.anlik_isinlar:
+                isin.ciz(self._isin_surface)
+            ekran.blit(self._isin_surface, (0, 0))
 
-        for z in self.zombiler: ekran.blit(z.image, (z.rect.x + ox, z.rect.y + oy))
+        # Görev 22 — Hızlı Zombi Trail Efekti
+        for z in self.zombiler:
+            if z.tip in ("hizli", "kosucu") and z.hiz > 0:
+                iz_s = pygame.Surface((z.yari_cap*2, z.yari_cap*2), pygame.SRCALPHA)
+                pygame.draw.circle(iz_s, (*z.renk, 40), (z.yari_cap, z.yari_cap), z.yari_cap)
+                ekran.blit(iz_s, (z.rect.x + ox - 6, z.rect.y + oy + 6))
+            ekran.blit(z.image, (z.rect.x + ox, z.rect.y + oy))
+            
         for z in self.zombiler: z.can_bar_ciz(ekran)
+
+        # Görev 19 — Sprint İz Efekti
+        for (ix, iy, it) in getattr(self.oyuncu, '_iz_konumlar', []):
+            yash = (pygame.time.get_ticks() - it) / 1000.0
+            alpha = max(0, int(120 * (1 - yash / 0.5)))
+            if alpha > 0:
+                iz_s = pygame.Surface((36, 36), pygame.SRCALPHA)
+                pygame.draw.circle(iz_s, (80, 160, 255, alpha), (18, 18), 18)
+                ekran.blit(iz_s, (int(ix) - 18 + ox, int(iy) - 18 + oy))
 
         ekran.blit(self.oyuncu.image, (self.oyuncu.rect.x + ox, self.oyuncu.rect.y + oy))
         
+        # Görev 20 — Manyetik Çekim Görsel Efekti
+        if 'manyetik' in self.perk_sis.aktif_perkler:
+            t = pygame.time.get_ticks() / 1000.0
+            for i in range(6):
+                aci = math.radians(t * 180 + i * 60)
+                rx = self.oyuncu.x + math.cos(aci) * 35 + ox
+                ry = self.oyuncu.y + math.sin(aci) * 35 + oy
+                pygame.draw.circle(ekran, (100, 200, 255), (int(rx), int(ry)), 4)
+
         for s in self.sayilar: s.ciz(ekran, self.font_sayi, self.font_sayi_b)
 
         # Karanlık Dalga Overlay
         if getattr(self.dalga_sis, "aktif_mod", None) and \
                 self.dalga_sis.aktif_mod.get("efekt") == "karanlik":
-            karanlik = pygame.Surface((GENISLIK, YUKSEKLIK), pygame.SRCALPHA)
-            karanlik.fill((0, 0, 0, 155))
-            ekran.blit(karanlik, (0, 0))
-            # Oyuncu etrafında bir projektif ışık dairesi bırak (pre-cached torch)
+            ekran.blit(self._karanlik_overlay, (0, 0))
             r = self._torch_r
             ekran.blit(self._torch_surface, (self.oyuncu.x - r + ox, self.oyuncu.y - r + oy))
+            
+        # Görev 42 — Harita Değiştirme Animasyonu
+        if getattr(self, '_harita_gecis', 0) > 0:
+            self._harita_gecis -= 0.016
+            alpha = int(255 * (self._harita_gecis / 0.4))
+            gecis = pygame.Surface((GENISLIK, YUKSEKLIK), pygame.SRCALPHA)
+            gecis.fill((0, 0, 0, alpha))
+            ekran.blit(gecis, (0, 0))
+            
+        # Görev 23 — Ultimate Ekran Flash Efekti
+        if getattr(self.oyuncu, '_ult_flash', 0) > 0:
+            self.oyuncu._ult_flash -= 0.016
+            alpha = max(0, min(255, int(180 * self.oyuncu._ult_flash / 0.3)))
+            flash = pygame.Surface((GENISLIK, YUKSEKLIK), pygame.SRCALPHA)
+            flash.fill((255, 220, 0, alpha))
+            ekran.blit(flash, (0, 0))
 
         # 2D/3D ve Harita ipucu metni
         ipucu = self.font_kucuk.render(
@@ -446,6 +567,7 @@ class OyunEkrani:
         ekran.blit(ipucu, (GENISLIK - ipucu.get_width() - 20, YUKSEKLIK - ipucu.get_height() - 20))
 
         self._ciz_hud(ekran)
+        self._ciz_boss_bar(ekran)
         self._ciz_bildirim(ekran)
         self._ciz_silah_bar(ekran)
         self.oyuncu.flash_ciz(ekran)
@@ -477,6 +599,13 @@ class OyunEkrani:
         pygame.draw.rect(ekran, (0, 30, 80), (bx, by, bg, byk), border_radius=6)
         if k_oran > 0: pygame.draw.rect(ekran, ZIRH_MAVI, (bx, by, int(bg * k_oran), byk), border_radius=6)
         ekran.blit(self.font_kucuk.render(f"SH: {int(self.oyuncu.kalkan)}", True, BEYAZ), (bx + 8, by))
+        
+        # Görev 14 — Kalkan yenilenme bekleme göstergesi
+        if self.oyuncu.kalkan_yenilenme_sayaci > 0:
+            bekleme_t = self.font_kucuk.render(
+                f"SH: {self.oyuncu.kalkan_yenilenme_sayaci:.1f}s", True, (100, 100, 200)
+            )
+            ekran.blit(bekleme_t, (bx + bg + 8, by - 22))
 
         # 3. Stamina
         by += 22
@@ -498,6 +627,17 @@ class OyunEkrani:
         pygame.draw.rect(ekran, (40, 40, 0), (bx, by, bg, byk), border_radius=6)
         if u_oran > 0: pygame.draw.rect(ekran, SARI, (bx, by, int(bg * u_oran), byk), border_radius=6)
         ekran.blit(self.font_kucuk.render("ULT [BOŞLUK]" if u_oran >= 1.0 else f"ULT: {self.oyuncu.ult_bekleme:.1f}s", True, SIYAH if u_oran >= 1.0 else BEYAZ), (bx + bg//2 - 45, by))
+        
+        # Görev 16 — Aktif Perk İkonları
+        if self.perk_sis.aktif_perkler:
+            py_ikon = 175
+            for p_key in self.perk_sis.aktif_perkler[:6]:  # max 6 göster
+                from sistemler.perk_sistemi import PERKLER
+                p = PERKLER.get(p_key, {})
+                isim = p.get("isim", p_key)[:12]
+                pt = self.font_kucuk.render(isim, True, (180, 255, 180))
+                ekran.blit(pt, (25, py_ikon))
+                py_ikon += 18
 
         # Sağ üst panel
         pygame.draw.rect(ekran, (10, 10, 15, 200), (GENISLIK - 240, 20, 220, 110), border_radius=12)
@@ -509,6 +649,18 @@ class OyunEkrani:
         ekran.blit(pt, (GENISLIK - pt.get_width() - 35, 60))
         dt2 = self.font_hud.render(f"DALGA: {self.dalga_sis.dalga_no}", True, (180, 255, 180))
         ekran.blit(dt2, (GENISLIK - dt2.get_width() - 35, 90))
+        
+        # Görev 33 — Zombi Sayısı Göstergesi
+        spawn_kalan = len(self.dalga_sis.spawn_listesi)
+        zombi_kalan = len(self.zombiler) + spawn_kalan
+        zt = self.font_hud.render(f"ZOMBİ: {zombi_kalan}", True, (220, 80, 80))
+        ekran.blit(zt, (GENISLIK - zt.get_width() - 35, 120))
+        
+        # Görev 28 — Dalga Modu Para Çarpanı Göstergesi
+        mod = getattr(self.dalga_sis, 'aktif_mod', None)
+        if mod and mod.get("efekt") == "para":
+            pt2 = self.font_hud.render("💰 2x PARA", True, ALTIN)
+            ekran.blit(pt2, (GENISLIK - pt2.get_width() - 35, 150))
 
         # Sağ alt panel - MERMİ GÖSTERGESİ (Büyütüldü)
         ak = self.oyuncu.aktif_silah
@@ -532,19 +684,26 @@ class OyunEkrani:
         if self.puan_sis.combo > 1:
             cx = GENISLIK // 2
             cy = 80
-            ct = self.font_buyuk.render(f"{self.puan_sis.combo}x COMBO!", True, TURUNCU)
-            ekran.blit(ct, (cx - ct.get_width() // 2, cy))
+            boyut = 46 + min(20, self.puan_sis.combo * 2)
+            boyut = (boyut // 4) * 4  # Görev 29 Font cache
+            font_combo = self._combo_fontlar.get(boyut, self.font_buyuk)
+            titreme = random.randint(-2, 2) if self.puan_sis.combo >= 5 else 0
+            renk = (255, 100, 0) if self.puan_sis.combo < 10 else (255, 50, 50)
+            ct = font_combo.render(f"{self.puan_sis.combo}x COMBO!", True, renk)
+            ekran.blit(ct, (cx - ct.get_width() // 2 + titreme, cy + titreme))
 
     def _ciz_silah_bar(self, ekran):
         bar_yuk = 80
         bar_y = YUKSEKLIK - bar_yuk - 20
         
         kart_gen, bosluk = 80, 10
+        # Görev 30 — Silah Bar Pencere Scroll
         sahip = [k for k in SILAH_SIRASI if k in self.oyuncu.envanter]
-        
-        # Çok fazla silah varsa ekranın altına sığmayabilir, sadece seçili silaha en yakın olanları çizebiliriz.
-        # Ya da basitçe hepsini çizelim (1920 ekranda 20-25 silah sığar).
-        gosterilecek = sahip[-15:] # Ekrana sığması için son 15 silah
+        aktif_idx = sahip.index(self.oyuncu.aktif_silah) if self.oyuncu.aktif_silah in sahip else 0
+        pencere_boyutu = 9
+        baslangic = max(0, min(len(sahip) - pencere_boyutu, aktif_idx - pencere_boyutu // 2))
+        baslangic = max(0, baslangic)
+        gosterilecek = sahip[baslangic:baslangic + pencere_boyutu]
         
         toplam_gen = len(gosterilecek) * (kart_gen + bosluk) - bosluk
         start_x = GENISLIK // 2 - toplam_gen // 2
@@ -573,12 +732,38 @@ class OyunEkrani:
             ekran.blit(isim_t, (kx + kart_gen//2 - isim_t.get_width()//2, ky + 45))
 
     def _ciz_bildirim(self, ekran):
+        # Görev 24 — Dalga Modu Ekran Kenarı Rengi
+        mod = getattr(self.dalga_sis, 'aktif_mod', None)
+        if mod and mod.get("efekt") not in (None, "karanlik"):
+            renk = mod.get("renk", (255, 255, 255))
+            alpha = max(0, min(255, 60 + int(30 * math.sin(pygame.time.get_ticks() / 300))))
+            cerceve = pygame.Surface((GENISLIK, YUKSEKLIK), pygame.SRCALPHA)
+            pygame.draw.rect(cerceve, (*renk, alpha), (0, 0, GENISLIK, YUKSEKLIK), 8)
+            ekran.blit(cerceve, (0, 0))
+
         metin, kalan = self.dalga_sis.bildirim_goster()
         if not metin: return
         alpha = min(255, int(255 * (kalan / 2.5)))
         surf = self.font_buyuk.render(metin, True, (255, 100, 100) if "BOSS" in metin else SARI)
         surf.set_alpha(alpha)
         ekran.blit(surf, (GENISLIK // 2 - surf.get_width() // 2, YUKSEKLIK // 2 - 120))
+        
+    def _ciz_boss_bar(self, ekran):
+        # Görev 15 — Boss Can Barı Sabitleme
+        for z in self.zombiler:
+            if z.tip == "boss" and z.alive():
+                bw, bh = 600, 22
+                bx = GENISLIK // 2 - bw // 2
+                by = 15
+                oran = max(0, z.can / z.max_can)
+                pygame.draw.rect(ekran, (60, 0, 0), (bx, by, bw, bh), border_radius=8)
+                if oran > 0:
+                    renk = (220, 30, 30) if oran > 0.3 else (255, 80, 0)
+                    pygame.draw.rect(ekran, renk, (bx, by, int(bw * oran), bh), border_radius=8)
+                pygame.draw.rect(ekran, (180, 0, 0), (bx, by, bw, bh), 2, border_radius=8)
+                bt = self.font_kucuk.render(f"👹 BOSS  {int(z.can)}/{int(z.max_can)}", True, (255, 200, 200))
+                ekran.blit(bt, (GENISLIK // 2 - bt.get_width() // 2, by + 2))
+                break
 
     @property
     def oyuncu_oldu_mu(self): return self.bitti

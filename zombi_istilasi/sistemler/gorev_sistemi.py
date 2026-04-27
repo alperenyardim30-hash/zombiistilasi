@@ -66,6 +66,10 @@ class GorevSistemi:
         if self.aktif_gorev:
             self.sayac["hasar_alindi"] += 1
 
+    def yakin_olum_bildir(self, mesafe):
+        """Yakın mesafede zombi öldürüldüğünde (gelecek görevler için yer tutucu)."""
+        pass
+
     def combo_bildir(self, combo):
         """Mevcut combo değerini bildir."""
         if self.aktif_gorev:
