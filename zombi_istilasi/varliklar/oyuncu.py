@@ -393,14 +393,23 @@ class Oyuncu(pygame.sprite.Sprite):
         self.recoil = min(self.recoil, 45.0) # Maksimum recoil sınırı
         
         # Silah sesini tipine göre seç (Profesyonel Mapping)
-        ses_anahtar = "ates"
-        if "ak47" in self.aktif_silah:    ses_anahtar = "ates_ak"
-        elif "smg" in self.aktif_silah or "minigun" in self.aktif_silah: ses_anahtar = "ates_smg"
-        elif "shotgun" in self.aktif_silah: ses_anahtar = "ates_pom"
-        elif "sniper" in self.aktif_silah:  ses_anahtar = "ates_sni"
-        elif "lazer" in self.aktif_silah or "plazma" in self.aktif_silah: ses_anahtar = "ates_laz"
-        elif "alev" in self.aktif_silah:   ses_anahtar = "ates_ale"
-        elif "bomba" in self.aktif_silah or "roket" in self.aktif_silah: ses_anahtar = "ates_pat"
+        ak = self.aktif_silah
+        if ak in ["smg","vector","pp90","bizon","minigun","vulcan","chaingun"]:
+            ses_anahtar = "ates_smg"
+        elif ak in ["ak47","m4a1","aug","scar","famas","an94","galil"]:
+            ses_anahtar = "ates_ak"
+        elif ak in ["shotgun","aa12","ksg","spas","striker","saiga"]:
+            ses_anahtar = "ates_pom"
+        elif ak in ["sniper","awm","barrett","intervention","cheytac","rail","nemesis"]:
+            ses_anahtar = "ates_sni"
+        elif ak in ["lazer","lazer_mk2","ion","taser_xl","phaser","plazma","plazma_mk2","void","antimatter","widowmaker","zeus","the_end"]:
+            ses_anahtar = "ates_laz"
+        elif ak in ["alev","napalm","drakon"]:
+            ses_anahtar = "ates_ale"
+        elif ak in ["bomba","roket","thermobarik","thor","orbital","apocalypse","mjolnir"]:
+            ses_anahtar = "ates_pat"
+        else:
+            ses_anahtar = "ates" # Tabanca ve varsayılan
         
         ses_sis.oynat(ses_anahtar)
 
