@@ -418,6 +418,9 @@ class Oyuncu(pygame.sprite.Sprite):
             mermiler.add(m)
 
     def hasar_al(self, miktar):
+        if getattr(self, "god_mode", False):
+            return  # Ölümsüzlük (God Mode) aciksa hasar alma
+            
         gercek = miktar * self.zirh_carpani
         if self.kalkan > 0:
             if self.kalkan >= gercek:

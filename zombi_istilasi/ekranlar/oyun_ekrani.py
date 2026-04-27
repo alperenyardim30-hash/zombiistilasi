@@ -64,6 +64,8 @@ class OyunEkrani:
         self.sarsinti    = 0.0
         self.bitti       = False
         self.son_fare_pos = (0, 0)
+        
+        self.hile_bekleme = 0.0  # Hile tuslari icin cooldown
 
     def baslat(self):
         self._sifirla()
@@ -80,6 +82,45 @@ class OyunEkrani:
         self.oyuncu.update(dt, tuslar, fare_pos, self.mermiler, GENISLIK, YUKSEKLIK, False)
         self.mermiler.update(dt, GENISLIK, YUKSEKLIK)
         self.puan_sis.update(dt)
+
+        # Hile / Test Komutlari
+        self.hile_bekleme -= dt
+        if self.hile_bekleme < 0: self.hile_bekleme = 0
+        
+        if self.hile_bekleme == 0:
+            keys = pygame.key.get_pressed()
+            if keys[pygame.K_F1]:
+                self.puan_sis.para += 50000
+                self.basarimlar.append(BasarimBildirimi("HİLE AKTİF", "50.000 Para Eklendi!"))
+                self.hile_bekleme = 0.5
+            elif keys[pygame.K_F2]:
+                self.puan_sis.xp_ekle(5000)
+                self.basarimlar.append(BasarimBildirimi("HİLE AKTİF", "5000 XP Eklendi!"))
+                self.hile_bekleme = 0.5
+            elif keys[pygame.K_F3]:
+                self.oyuncu.can = getattr(self.oyuncu, "max_can", 100)
+                self.oyuncu.kalkan = getattr(self.oyuncu, "max_kalkan", 100)
+                self.oyuncu.ult_bekleme = 0
+                self.basarimlar.append(BasarimBildirimi("HİLE AKTİF", "Can, Kalkan ve Ulti Fullendi!"))
+                self.hile_bekleme = 0.5
+            elif keys[pygame.K_F4]:
+                for s in SILAH_SIRASI:
+                    if s not in self.oyuncu.envanter:
+                        self.oyuncu.envanter.append(s)
+                    self.oyuncu.mermiler[s] = 9999
+                self.basarimlar.append(BasarimBildirimi("HİLE AKTİF", "Tüm Silahlar Açıldı ve Mermi: 9999!"))
+                self.hile_bekleme = 0.5
+            elif keys[pygame.K_F5]:
+                for z in list(self.zombiler):
+                    z.can = 0
+                    self._zombi_oldu(z)
+                self.basarimlar.append(BasarimBildirimi("HİLE AKTİF", "Ekrandaki Tüm Zombiler Öldürüldü!"))
+                self.hile_bekleme = 0.5
+            elif keys[pygame.K_F6]:
+                self.oyuncu.god_mode = not getattr(self.oyuncu, "god_mode", False)
+                durum = "AÇIK" if self.oyuncu.god_mode else "KAPALI"
+                self.basarimlar.append(BasarimBildirimi("HİLE AKTİF", f"Ölümsüzlük (God Mode) {durum}"))
+                self.hile_bekleme = 0.5
 
         # Raycast silah kuyrugunu isle
         for rc in self.oyuncu.raycast_kuyrugu:
