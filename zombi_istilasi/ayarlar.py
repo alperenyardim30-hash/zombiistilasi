@@ -20,7 +20,7 @@ def _ekran_boyutu_al():
 
 GENISLIK, YUKSEKLIK = _ekran_boyutu_al()
 
-FPS = 200
+FPS = 60  # 2D top-down oyun icin 60 FPS yeterli, CPU kullanimi 1/3'e duser
 BASLIK = "🧟 Zombi İstilası — 100+ Dev Güncelleme!"
 
 # Renkler
@@ -42,7 +42,8 @@ ZIRH_MAVI  = (60, 140, 255)
 ARKAPLAN   = (14, 18, 22)
 ZOMBI_YESIL= (90, 160, 70)
 
-# Zorluk
+# Zorluk — NOT: Bu global artik dogrudan yazilmamali.
+# DalgaSistemi instance uzerinden yonetilecek.
 ZORLUK_CARPANI = 1.0
 
 # Zombi Element Zafiyetleri (carpan >= 1.5 = ZAYIF NOKTA, <= 0.5 = DIRENCLI)
@@ -255,6 +256,7 @@ for s_key, s_veri in TEMEL_SILAHLAR.items():
         "mermi_adeti": s_veri["adet"], "kapasite": s_veri["kapasite"],
         "renk": s_veri.get("renk", (200,200,200)), "tip": s_veri["tip"],
         "patlama_r": s_veri.get("r", 0), "efekt": "yok",
+        "gorsel_tip": GORSEL_TIP_MAP.get(s_key, "normal"),  # BUG FIX: gorsel_tip artik SILAHLAR'a ekleniyor
         "aciklama": [f"Hasar: {s_veri['hasar']}", f"Kapasite: {s_veri['kapasite']}", f"Fiyat: {fiyat}$"]
     }
     SILAH_SIRASI.append(s_key)

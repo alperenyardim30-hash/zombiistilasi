@@ -28,12 +28,24 @@ class OyunEkrani:
         self.font_sayi_b = pygame.font.SysFont("Impact", 32)
         self.font_mermi  = pygame.font.SysFont("Impact", 56)
         
-        # Grafik iyileştirme: Zemin Detayları (Kan ve Enkaz)
-        self._zemin = []
+        # Grafik iyileştirme: Zemin Detayları — PRE-RENDER edilmiş Surface
+        self._zemin_verileri = []
         for _ in range(300):
             r = random.choice([2, 3, 5])
-            c = random.choice([(30, 35, 40), (20, 25, 30), (45, 25, 25)]) # Kırmızımsı lekeler ve gri taşlar
-            self._zemin.append((random.randint(-200, GENISLIK + 200), random.randint(-200, YUKSEKLIK + 200), r, c))
+            c = random.choice([(30, 35, 40), (20, 25, 30), (45, 25, 25)])
+            self._zemin_verileri.append((random.randint(-200, GENISLIK + 200), random.randint(-200, YUKSEKLIK + 200), r, c))
+        # Zemin surface'i bir kez olustur (her frame 300 circle cizimine son)
+        self._zemin_surface = pygame.Surface((GENISLIK + 400, YUKSEKLIK + 400), pygame.SRCALPHA)
+        for (px, py, pr, pcolor) in self._zemin_verileri:
+            pygame.draw.circle(self._zemin_surface, pcolor, (px + 200, py + 200), pr)
+
+        # Karanlık dalga torch efekti — bir kez olustur
+        torch_r = 200
+        self._torch_surface = pygame.Surface((torch_r*2, torch_r*2), pygame.SRCALPHA)
+        for dr in range(torch_r, 0, -4):
+            a = int(155 * (1 - dr/torch_r) ** 2)
+            pygame.draw.circle(self._torch_surface, (0, 0, 0, 155 - a), (torch_r, torch_r), dr)
+        self._torch_r = torch_r
 
         self.haritalar = [
             {"isim": "Sehir Asfalti", "zemin": (10, 12, 16), "cizgi": (22, 28, 36), "karo": 80},
@@ -60,10 +72,13 @@ class OyunEkrani:
         self.perk_sis    = PerkSistemi()
         self.gorev_sis   = GorevSistemi()
         self.gorev_sis.yeni_gorev_sec()
+        # Perk sistemi referansini oyuncuya bagla (ikiz_namlu, hasar_alindi vs)
+        self.oyuncu._perk_sis_ref = self.perk_sis
         
         self.sarsinti    = 0.0
         self.bitti       = False
         self.son_fare_pos = (0, 0)
+        self._dalga_bitti_setter = False  # Cheat ile dalga atlama icin
         
         self.hile_bekleme = 0.0  # Hile tuslari icin cooldown
 
@@ -94,7 +109,7 @@ class OyunEkrani:
                 self.basarimlar.append(BasarimBildirimi("HİLE AKTİF", "50.000 Para Eklendi!"))
                 self.hile_bekleme = 0.5
             elif keys[pygame.K_F2]:
-                self.puan_sis.xp_ekle(5000)
+                self.puan_sis._xp_ekle(5000)
                 self.basarimlar.append(BasarimBildirimi("HİLE AKTİF", "5000 XP Eklendi!"))
                 self.hile_bekleme = 0.5
             elif keys[pygame.K_F3]:
@@ -131,12 +146,12 @@ class OyunEkrani:
         self.anlik_isinlar = [i for i in self.anlik_isinlar if i.update(dt)]
 
 
-        for zh in self.zehir_havuzlari[:]:
+        for zh in self.zehir_havuzlari:
             zh[3] -= dt
-            if zh[3] <= 0:
-                self.zehir_havuzlari.remove(zh)
-            elif math.hypot(zh[0] - self.oyuncu.x, zh[1] - self.oyuncu.y) < (zh[2] + self.oyuncu.yari_cap):
+            if zh[3] > 0 and math.hypot(zh[0] - self.oyuncu.x, zh[1] - self.oyuncu.y) < (zh[2] + self.oyuncu.yari_cap):
                 self.oyuncu.zombi_temas(dt, 5)
+        # Suresi dolan havuzlari filtrele (list.remove O(N) yerine list comprehension O(1))
+        self.zehir_havuzlari = [zh for zh in self.zehir_havuzlari if zh[3] > 0]
 
         for z in list(self.zombiler):
             z.update(dt, self.oyuncu.x, self.oyuncu.y)
@@ -151,12 +166,10 @@ class OyunEkrani:
                 continue
                 
             if z.oyuncuya_yakin_mi(self.oyuncu.x, self.oyuncu.y):
-                if z.tip == "patlayan":
-                    self.patlamalar.append(Patlama(z.x, z.y, 120))
-                    self.oyuncu.hasar_al(40)
-                    z.kill()
-                    self.sarsinti = 0.3
-                else:
+                if z.tip == "patlayan" and z.alive():
+                    # Patlayan zombi: direkt oldur, _zombi_oldu iceride patlama yapar
+                    self._zombi_oldu(z, patlama_mi=True)
+                elif z.tip != "patlayan":
                     self.oyuncu.zombi_temas(dt, z.hasar)
                     
                 if self.oyuncu.oldu:
@@ -200,7 +213,8 @@ class OyunEkrani:
             if m.tip in ("roket", "seken_bomba", "delici_patlayan"):
                 for z in yakindaki_zombiler:
                     if math.hypot(z.x - m.x, z.y - m.y) < (z.yari_cap + m.yari_cap):
-                        self.patlamalar.append(Patlama(m.x, m.y, m.patlama_r))
+                        # Patlama olustur — silah hasarini aktar
+                        self.patlamalar.append(Patlama(m.x, m.y, m.patlama_r, hasar=m.hasar))
                         m.kill()
                         break
             else:
@@ -238,20 +252,23 @@ class OyunEkrani:
 
         for m in list(self.mermiler):
             if not m.alive() and m.tip in ("roket", "seken_bomba", "delici_patlayan") and m.patlama_hazir:
-                self.patlamalar.append(Patlama(m.x, m.y, m.patlama_r))
+                self.patlamalar.append(Patlama(m.x, m.y, m.patlama_r, hasar=m.hasar))
 
         for p in self.patlamalar[:]:
             p.update(dt)
             if not p.hasar_verildi:
-                oldukler = p.zombi_hasari_ver(self.zombiler, self.oyuncu.hasar_carpani * p.r * 1.5)
+                oldukler = p.zombi_hasari_ver(self.zombiler, hasar_carpani=self.oyuncu.hasar_carpani)
                 for z in oldukler:
-                    self.sayilar.append(HarasarSayisi(z.x, z.y, self.oyuncu.hasar_carpani * p.r * 1.5, SARI, True))
+                    # Gercek patlama hasarini goster
+                    gosterilen = int(p.hasar * self.oyuncu.hasar_carpani) if p.hasar > 0 else int(p.max_r * 1.5)
+                    self.sayilar.append(HarasarSayisi(z.x, z.y, gosterilen, SARI, True))
                     self._zombi_oldu(z)
             if p.bitti_mi:
                 self.patlamalar.remove(p)
 
+        manyetik = self.perk_sis.drop_manyetik_mi()
         for d in list(self.droplar):
-            d.update(dt)
+            d.update(dt, manyetik=manyetik, oyuncu_x=self.oyuncu.x, oyuncu_y=self.oyuncu.y)
             if d.alive() and d.oyuncuya_dokunan(self.oyuncu.x, self.oyuncu.y, self.oyuncu.yari_cap):
                 if d.tip == "can":
                     self.oyuncu.can_doldur(40)
@@ -280,11 +297,15 @@ class OyunEkrani:
         self.gorev_sis.guncelle(dt, self.puan_sis)
 
     def _zombi_oldu(self, z, patlama_mi=False):
-        if not z.alive(): return
+        if not z.alive(): return  # Cift olum guardi
         if z.tip == "patlayan":
-            self.patlamalar.append(Patlama(z.x, z.y, 120))
+            # Patlayan zombi kendi patlaması: 40 hasar, 120 yarıçap
+            self.patlamalar.append(Patlama(z.x, z.y, 120, hasar=40))
             if z.patlama_hasar_mesafe(self.oyuncu.x, self.oyuncu.y) < 120 + self.oyuncu.yari_cap:
                 self.oyuncu.hasar_al(40)
+        
+        # ONCE kill() — tekrar _zombi_oldu'ya girmesini engeller
+        z.kill()
                 
         self.parcaciklar.extend(kan_parcaciklari(z.x, z.y, 18))
         # Perk: vampir ve para_avcisi
@@ -301,7 +322,6 @@ class OyunEkrani:
         self.sarsinti = 0.12 if z.tip != "boss" else 0.35
         drop = z.drop_olustur()
         if drop: self.droplar.add(drop)
-        z.kill()
 
     def _bitis(self):
         self.bitti = True
@@ -322,8 +342,9 @@ class OyunEkrani:
         x, y = rc["x"], rc["y"]
         aci = rc["aci"]
         veri = rc["veri"]
-        hasar = veri["hasar"] * rc["carpan"] * self.oyuncu.hasar_carpani
+        hasar_baz = veri["hasar"] * rc["carpan"] * self.oyuncu.hasar_carpani
         renk = veri["renk"]
+        efekt = veri.get("efekt", "yok")
 
         # Isin uzunlugu
         uzunluk = min(GENISLIK + YUKSEKLIK, veri.get("mermi_hizi", 1400))
@@ -332,13 +353,23 @@ class OyunEkrani:
         by = y + math.sin(aci_rad) * uzunluk
 
         # Tum zombileri kontrol et — isabededenler hasar alir
+        from ayarlar import ZAFIYET_TABLOSU
         for z in list(self.zombiler):
             if not z.alive():
                 continue
             uzaklik = self._nokta_cizgiye_uzaklik(z.x, z.y, x, y, bx, by)
             if uzaklik < z.yari_cap + 3:
+                # BUG FIX: Zafiyet tablosu artik raycast icin de uygulanıyor
+                zafiyet = ZAFIYET_TABLOSU.get(z.tip, {})
+                carpan = zafiyet.get(efekt, 1.0) if efekt != "yok" else 1.0
+                hasar = hasar_baz * carpan
                 z.can -= hasar
                 z.hit_sayac = 0.12
+                # Zafiyet mesaji
+                if carpan >= 1.5:
+                    self.sayilar.append(HarasarSayisi(z.x, z.y - 20, "ZAYIF NOKTA!", SARI, True))
+                elif carpan <= 0.5:
+                    self.sayilar.append(HarasarSayisi(z.x, z.y - 20, "DİRENÇLİ", (160, 160, 160)))
                 self.sayilar.append(HarasarSayisi(z.x, z.y, int(hasar), renk))
                 self.parcaciklar.extend(kan_parcaciklari(z.x, z.y, 4, renk))
                 if z.can <= 0:
@@ -362,8 +393,8 @@ class OyunEkrani:
         for y in range(int(oy) % kare, YUKSEKLIK, kare):
             pygame.draw.line(ekran, aktif_harita["cizgi"], (0, y), (GENISLIK, y), 2)
             
-        for (px, py, pr, pcolor) in self._zemin:
-            pygame.draw.circle(ekran, pcolor, (px + ox, py + oy), pr)
+        # Zemin pre-rendered surface (300 circle artik her frame cizilmiyor)
+        ekran.blit(self._zemin_surface, (-200 + ox, -200 + oy))
             
         for zh in self.zehir_havuzlari:
             alpha = int(90 * (zh[3] / zh[4]))
@@ -398,13 +429,9 @@ class OyunEkrani:
             karanlik = pygame.Surface((GENISLIK, YUKSEKLIK), pygame.SRCALPHA)
             karanlik.fill((0, 0, 0, 155))
             ekran.blit(karanlik, (0, 0))
-            # Oyuncu etrafında bir projektif ışık dairesi bırak
-            r = 200
-            torch = pygame.Surface((r*2, r*2), pygame.SRCALPHA)
-            for dr in range(r, 0, -4):
-                a = int(155 * (1 - dr/r) ** 2)
-                pygame.draw.circle(torch, (0, 0, 0, 155 - a), (r, r), dr)
-            ekran.blit(torch, (self.oyuncu.x - r + ox, self.oyuncu.y - r + oy))
+            # Oyuncu etrafında bir projektif ışık dairesi bırak (pre-cached torch)
+            r = self._torch_r
+            ekran.blit(self._torch_surface, (self.oyuncu.x - r + ox, self.oyuncu.y - r + oy))
 
         # 2D/3D ve Harita ipucu metni
         ipucu = self.font_kucuk.render(
@@ -553,6 +580,8 @@ class OyunEkrani:
     def oyuncu_oldu_mu(self): return self.bitti
     @property
     def dalga_bitti_mi(self): return self.dalga_sis.dalga_bitti
+    @dalga_bitti_mi.setter
+    def dalga_bitti_mi(self, val): self.dalga_sis.dalga_bitti = val
     @property
     def son_puan(self): return self.puan_sis.puan
     @property

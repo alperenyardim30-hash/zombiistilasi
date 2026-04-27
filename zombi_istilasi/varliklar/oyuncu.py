@@ -225,7 +225,7 @@ class Oyuncu(pygame.sprite.Sprite):
         if tuslar.get("ates") and self.ates_sayac <= 0:
             mevcut_mermi = self.mermiler.get(self.aktif_silah, -1)
             if mevcut_mermi > 0 or mevcut_mermi == -1:
-                self._ates(mermiler)
+                self._ates(mermiler, perk_sis=getattr(self, '_perk_sis_ref', None))
             else:
                 self.siradaki_silah()
             
@@ -354,9 +354,12 @@ class Oyuncu(pygame.sprite.Sprite):
         # Namlu merkezine ufak hedef noktası
         pygame.draw.circle(ekran, veri["renk"], (int(namlu_x), int(namlu_y)), 2)
 
-    def _ates(self, mermiler):
+    def _ates(self, mermiler, perk_sis=None):
         veri = self.silah_verisi
         adeti = veri["mermi_adeti"]
+        # PERK: ikiz_namlu — mermi adedini ikiye katla
+        if perk_sis and perk_sis.ikiz_namlu_mu():
+            adeti *= 2
         yayilma = getattr(self, "guncel_yayilma", veri["yayilma"])
         gorsel_tip = veri.get("gorsel_tip", "normal")
 
@@ -435,6 +438,9 @@ class Oyuncu(pygame.sprite.Sprite):
             
         self.hasarli_sayac = OYUNCU_HASAR_FLASH
         self.kalkan_yenilenme_sayaci = OYUNCU_KALKAN_GECIKME
+        # PERK: hasar alındığında perk efektleri uygula
+        if hasattr(self, '_perk_sis_ref') and self._perk_sis_ref:
+            self._perk_sis_ref.uygula_hasar_alindi(self)
         if self.can <= 0:
             self.can = 0
             self.oldu = True

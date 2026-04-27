@@ -80,6 +80,18 @@ class Zombi(pygame.sprite.Sprite):
         pygame.draw.circle(hl, (255, 60, 60, 150), (cx, cy), r)
         hit.blit(hl, (0, 0))
         self._hit_image = hit
+        
+        # PERFORMANS: Donma/yanma overlay'lerini bir kez olustur (her frame SRCALPHA olusturmaya son)
+        donma_overlay = pygame.Surface((boyut, boyut), pygame.SRCALPHA)
+        pygame.draw.circle(donma_overlay, (0, 200, 255, 100), (cx, cy), r)
+        self._donma_image = self._base_image.copy()
+        self._donma_image.blit(donma_overlay, (0, 0))
+        
+        yanma_overlay = pygame.Surface((boyut, boyut), pygame.SRCALPHA)
+        pygame.draw.circle(yanma_overlay, (255, 100, 0, 100), (cx, cy), r)
+        self._yanma_image = self._base_image.copy()
+        self._yanma_image.blit(yanma_overlay, (0, 0))
+        
         self.image = self._base_image
 
     def durum_guncelle(self, dt):
@@ -139,19 +151,11 @@ class Zombi(pygame.sprite.Sprite):
         else:
             self.image = self._base_image
             
-        # Görsel Efekt Katmanları (Donma, Yanma vb.)
+        # Görsel Efekt Katmanları — CACHED overlay kullan (her frame Surface olusturmaya son)
         if self.donma_sayac > 0:
-            d_img = self.image.copy()
-            s = pygame.Surface((self.image.get_width(), self.image.get_height()), pygame.SRCALPHA)
-            pygame.draw.circle(s, (0, 200, 255, 100), (s.get_width()//2, s.get_height()//2), self.yari_cap)
-            d_img.blit(s, (0, 0))
-            self.image = d_img
+            self.image = self._donma_image
         elif self.yanma_sayac > 0:
-            y_img = self.image.copy()
-            s = pygame.Surface((self.image.get_width(), self.image.get_height()), pygame.SRCALPHA)
-            pygame.draw.circle(s, (255, 100, 0, 100), (s.get_width()//2, s.get_height()//2), self.yari_cap)
-            y_img.blit(s, (0, 0))
-            self.image = y_img
+            self.image = self._yanma_image
         elif self.sok_sayac > 0:
             # Şok için sarsıntı efekti
             self.rect.x += random.randint(-2, 2)

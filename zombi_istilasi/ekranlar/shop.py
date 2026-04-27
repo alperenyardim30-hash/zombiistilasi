@@ -161,22 +161,32 @@ class Shop:
                 ekran.blit(tt, (kx+kw-46, ky+3))
 
     def _ciz_alt_panel(self, ekran, oyuncu, puan_sis):
-        py = YUKSEKLIK - 70
-        pygame.draw.rect(ekran, (18, 22, 30), (0, py, GENISLIK, 70))
-        pygame.draw.line(ekran, (50, 55, 65), (0, py), (GENISLIK, py), 2)
+        alt_y = YUKSEKLIK - 70
+        pygame.draw.rect(ekran, (18, 22, 30), (0, alt_y, GENISLIK, 70))
+        pygame.draw.line(ekran, (50, 55, 65), (0, alt_y), (GENISLIK, alt_y), 2)
 
-        # Yukseltmeler
+        # Yukseltmeler — tiklanabilir kartlar
         bx = 15
+        fare = pygame.mouse.get_pos()
         for key, veri in YUKSELTMELER.items():
             seviye = oyuncu.yukseltmeler.get(key, 0)
             maks = veri["max_seviye"]
             fiyat = veri["fiyat"] * (seviye + 1)
+            
+            # Kart arkaplan (tiklanabilir alani goster)
+            kart_rect = pygame.Rect(bx, alt_y + 4, 115, 60)
+            hover = kart_rect.collidepoint(fare)
+            bg = (35, 40, 50) if hover else (22, 26, 34)
+            border = CAMGOBEGI if seviye < maks else (50, 50, 50)
+            pygame.draw.rect(ekran, bg, kart_rect, border_radius=6)
+            pygame.draw.rect(ekran, border, kart_rect, 1, border_radius=6)
+            
             renk = CAMGOBEGI if seviye < maks else (80,80,80)
             txt = f"{veri['isim']} Lv{seviye}/{maks}"
             t = self.font_kucuk.render(txt, True, renk)
-            ekran.blit(t, (bx, py + 8))
+            ekran.blit(t, (bx + 4, alt_y + 10))
             ft = self.font_kucuk.render(f"{fiyat}$", True, ALTIN if seviye < maks else (80,80,80))
-            ekran.blit(ft, (bx, py + 24))
+            ekran.blit(ft, (bx + 4, alt_y + 28))
             bx += 120
 
     def _ciz_devam_butonu(self, ekran):
