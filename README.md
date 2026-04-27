@@ -1,24 +1,36 @@
 # 🧟 Zombi İstilası
 
-Pygame ile yazılmış, dalga tabanlı bir zombi hayatta kalma oyunu altyapısı.
+Pygame ile geliştirilmiş, 2D yukarıdan bakışlı (top-down) zombi hayatta kalma ve aksiyon oyunu. Oyuncular çeşitli silahlar, farklı element güçleri (Ateş, Buz, Zehir, Elektrik) kullanarak giderek zorlaşan zombi dalgalarına karşı hayatta kalmaya çalışır.
 
-## Mevcut Durum
-Bu repoda şu anda çekirdek başlatma ve ayar dosyaları bulunuyor:
-
-- `zombi_istilasi/main.py`: Ana oyun döngüsü ve durum yönetimi.
-- `zombi_istilasi/ayarlar.py`: Oyun sabitleri, silah/element tablosu ve genel ayarlar.
-
-> Not: `main.py` içinde `ekranlar.*` modülleri import ediliyor. Bu klasör/projeler eksikse oyun başlatılamaz.
+## Özellikler
+- **55 Farklı Silah:** Tabancalar, pompalı tüfekler, taarruz tüfekleri, keskin nişancı tüfekleri, enerji silahları ve daha fazlası.
+- **Element Sistemi:** Ateş (yakıcı), Buz (yavaşlatıcı), Zehir (zamanla hasar), Elektrik (seken hasar) ve Kinetik (itme kuvveti) efektleriyle stratejik savaş.
+- **Gelişmiş Zombi Yapay Zekası:** Çeşitli zombi tipleri (Hızlı, Tank, Menzilli, vb.) ve sürü davranışları.
+- **Market (Shop) Sistemi:** Dalgalar arasında veya oyun içinde silah satın alma, mermi yenileme ve can doldurma imkanı.
+- **Açık Dünya / Arena Karışımı:** Geniş ve keşfedilebilir devasa harita, farklı bölgeler.
+- **Gelişmiş Görsel Efektler:** Silahlara ve elementlere özel mermi izleri, çarpma efektleri (kan, parçacık, duman, lazer) ve kamera sarsıntısı.
 
 ## Kurulum
 
+Projeyi bilgisayarınızda çalıştırmak için Python 3.8+ yüklü olmalıdır.
+
 ```bash
+# Sanal ortam oluşturun
 python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
-pip install pygame
+# Windows için sanal ortamı aktifleştirme:
+.venv\Scripts\activate
+# Mac/Linux için:
+# source .venv/bin/activate
+
+# Gerekli bağımlılıkları yükleyin
+pip install -r requirements.txt
 ```
 
+*(Eğer `requirements.txt` bulunmuyorsa, sadece `pip install pygame` komutunu çalıştırmanız yeterlidir.)*
+
 ## Çalıştırma
+
+Oyunu başlatmak için aşağıdaki komutu kullanın:
 
 ```bash
 python zombi_istilasi/main.py
@@ -26,31 +38,20 @@ python zombi_istilasi/main.py
 
 ## Kontroller
 
-- **WASD / Ok tuşları**: Hareket
-- **Sol tık**: Ateş
-- **Sağ tık**: Nişan
-- **Shift**: Sprint
-- **Space**: Ultimate
-- **B**: Shop
-- **M (2D modda)**: Harita değiştir (Şehir / Laboratuvar)
-- **ESC**: Duraklat / Menülerden çıkış
-- **1-9**: Silah seçimi
-- **Mouse wheel**: Silah değiştirme
+- **WASD / Yön Tuşları**: Karakteri hareket ettirir.
+- **Fare (Mouse)**: Nişan alma.
+- **Sol Tık**: Ateş etme (Basılı tutarak otomatik silahlarda sürekli ateş).
+- **Sağ Tık**: Odaklanarak (Aim) nişan alma (İsabet oranını artırır).
+- **Shift**: Koşma (Stamina harcar).
+- **Space**: Dash / Hızlı Kaçış (veya karakterin Ultimate yeteneği).
+- **B Tuşu**: Market (Shop) menüsünü açar/kapatır.
+- **ESC Tuşu**: Oyunu duraklatır (Pause) ve menüyü açar.
+- **F1 Tuşu**: Geliştirici (Cheat/Debug) konsolunu veya debug arayüzünü açar.
+- **1-9 Tuşları**: Envanterdeki silahlara hızlı geçiş.
+- **Fare Tekerleği**: Silahlar arasında ileri/geri geçiş.
 
-## Bu turda yapılan teknik iyileştirmeler
+## Katkıda Bulunma
+Bu proje geliştirilmeye devam etmektedir. Herhangi bir hata bulursanız veya özellik eklemek isterseniz, Pull Request (PR) gönderebilirsiniz.
 
-- Oyun içi fare görünürlüğü/grab yönetimi tek bir yardımcı fonksiyonda toplandı.
-- Eksik modül durumları için daha anlaşılır hata mesajı eklendi.
-- Ortam değişkenleri `setdefault` ile daha güvenli hale getirildi.
-- Ekran çözünürlüğü alma akışı fonksiyonlaştırıldı ve platformlar arası fallback netleştirildi.
-- `highscore` dizini başlangıçta otomatik oluşturulacak şekilde güvence altına alındı.
-- 2D mod için iki farklı harita teması eklendi (M tuşu ile anlık geçiş).
-- Aim cone sistemi silah tipine göre (alev/roket/delici) ayrı davranacak şekilde iyileştirildi.
-- Karakterin elinde görünen silah sprite'ı, aktif silaha göre dinamik değişecek hale getirildi.
-
-## Önerilen Sonraki Adımlar
-
-1. `ekranlar/` klasörünü ve alt sınıfları repoya ekle.
-2. `requirements.txt` dosyası ekle (`pygame` sürüm pinlemesi ile).
-3. `kayitlar/highscore.json` için okuma/yazma doğrulama ve bozuk dosya toleransı ekle.
-4. Basit birim testleri (özellikle `ayarlar.py` üretim tabloları için) ekle.
+## Lisans
+Bu proje açık kaynaklıdır ve eğitim/eğlence amaçlı geliştirilmiştir.
