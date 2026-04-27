@@ -18,6 +18,7 @@ from sistemler.dalga_sistemi import DalgaSistemi
 from sistemler.puan_sistemi  import PuanSistemi
 from sistemler.perk_sistemi  import PerkSistemi
 from sistemler.gorev_sistemi import GorevSistemi
+from sistemler.ses_sistemi   import ses_sis
 
 class OyunEkrani:
     def __init__(self):
@@ -276,6 +277,7 @@ class OyunEkrani:
                 elif d.tip == "mermi":
                     self.oyuncu.aktif_mermi_doldur()
                     self.sayilar.append(HarasarSayisi(self.oyuncu.x, self.oyuncu.y, "+Mermi!", SARI, True))
+                ses_sis.oynat("drop_al")
                 d.kill()
 
         self.parcaciklar = [p for p in self.parcaciklar if p.update(dt)]
@@ -285,6 +287,7 @@ class OyunEkrani:
         if self.puan_sis.yeni_seviye_flag:
             self.puan_sis.yeni_seviye_flag = False
             self.basarimlar.append(BasarimBildirimi(f"SEVİYE {self.puan_sis.seviye}!", "Tüm istatistiklerin artıyor!"))
+            ses_sis.oynat("ui_level_up")
 
         if self.oyuncu.yoruldu_mu and not getattr(self, "_yoruldu_bildirildi", False):
             self._yoruldu_bildirildi = True
@@ -320,6 +323,7 @@ class OyunEkrani:
         self.sayilar.append(HarasarSayisi(z.x, z.y - 25, f"+{elde_para}$", ALTIN))
         
         self.sarsinti = 0.12 if z.tip != "boss" else 0.35
+        ses_sis.zombi_olum_sesi_oynat()
         drop = z.drop_olustur()
         if drop: self.droplar.add(drop)
 

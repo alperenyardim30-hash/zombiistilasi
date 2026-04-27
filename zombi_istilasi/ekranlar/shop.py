@@ -5,6 +5,7 @@ from ayarlar import (
     SARI, ALTIN, CAMGOBEGI,
     SILAHLAR, SILAH_SIRASI, YUKSELTMELER, DURBUNLER
 )
+from sistemler.ses_sistemi import ses_sis
 
 # Silah kategorileri
 KATEGORILER = [
@@ -266,6 +267,7 @@ class Shop:
     def _satin_al(self, key, oyuncu, puan_sis):
         if key in oyuncu.envanter:
             self._mesaj("Zaten sahipsin!")
+            ses_sis.oynat("ui_click")
             return
         v = SILAHLAR[key]
         fiyat = v["fiyat"]
@@ -273,19 +275,24 @@ class Shop:
             fiyat = int(fiyat * self.firsat_carpani)
         if puan_sis.harca(fiyat):
             oyuncu.silah_al(key)
+            ses_sis.oynat("ui_satin_al")
             self._mesaj(f"{v['isim']} alindi!")
         else:
+            ses_sis.oynat("ui_click")
             self._mesaj(f"Yeterli para yok! ({fiyat}$ gerekli)")
 
     def _yukseltme_al(self, key, oyuncu, puan_sis):
         veri = YUKSELTMELER[key]
         seviye = oyuncu.yukseltmeler.get(key, 0)
         if seviye >= veri["max_seviye"]:
+            ses_sis.oynat("ui_click")
             self._mesaj("Maks seviye!")
             return
         fiyat = veri["fiyat"] * (seviye + 1)
         if puan_sis.harca(fiyat):
             oyuncu.yukseltmeler[key] = seviye + 1
+            ses_sis.oynat("ui_satin_al")
             self._mesaj(f"{veri['isim']} Lv{seviye+1}!")
         else:
+            ses_sis.oynat("ui_click")
             self._mesaj(f"Yeterli para yok! ({fiyat}$ gerekli)")

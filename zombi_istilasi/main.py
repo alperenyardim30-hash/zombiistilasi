@@ -22,6 +22,7 @@ from ayarlar import (
     SILAH_SIRASI,
     YUKSEKLIK,
 )
+from sistemler.ses_sistemi import ses_sis
 
 DURUM_PERK = "perk"
 
@@ -89,7 +90,10 @@ def main():
             if durum == DURUM_MENU:
                 sonuc = ana_menu.tik_isle(event, 0)
                 if sonuc == DURUM_OYUN:
-                    oyun_ekrani.baslat(); durum = DURUM_OYUN
+                    oyun_ekrani.baslat()
+                    durum = DURUM_OYUN
+                    ses_sis.ambiyans_baslat()
+                    _fare_durumu_ayarla(aktif_oyun=True)
                 elif sonuc == "cikis":
                     pygame.quit(); sys.exit()
 
@@ -97,9 +101,11 @@ def main():
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_ESCAPE:
                         durum = DURUM_PAUSE
+                        ses_sis.duraksat()
                         _fare_durumu_ayarla(aktif_oyun=False)
                     elif event.key == pygame.K_b:
                         durum = DURUM_SHOP
+                        ses_sis.duraksat()
                         _fare_durumu_ayarla(aktif_oyun=False)
                     elif event.key == pygame.K_m:
                         oyun_ekrani.harita_degistir()
@@ -115,17 +121,23 @@ def main():
             elif durum == DURUM_PAUSE:
                 if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
                     durum = DURUM_OYUN
+                    ses_sis.devam_et()
                 else:
                     sonuc = duraklama.tik_isle(event)
                     if sonuc == "devam":
                         durum = DURUM_OYUN
-                    elif sonuc == "menu":  durum = DURUM_MENU
-                    elif sonuc == "cikis": pygame.quit(); sys.exit()
+                        ses_sis.devam_et()
+                    elif sonuc == "menu":
+                        ses_sis.ambiyans_durdur()
+                        durum = DURUM_MENU
+                    elif sonuc == "cikis":
+                        pygame.quit(); sys.exit()
 
 
             elif durum == DURUM_SHOP:
                 if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
                     durum = DURUM_OYUN
+                    ses_sis.devam_et()
                     _fare_durumu_ayarla(aktif_oyun=False)
                 
                 sonuc = shop.tik_isle(event, oyun_ekrani.oyuncu, oyun_ekrani.puan_sis)
@@ -137,6 +149,7 @@ def main():
                     if oyun_ekrani.dalga_sis.dalga_no > 0 and oyun_ekrani.dalga_sis.dalga_no % 3 == 0:
                         oyun_ekrani.perk_sis.perk_sec_hazirla()
                     durum = DURUM_OYUN
+                    ses_sis.devam_et()
                     _fare_durumu_ayarla(aktif_oyun=False)
 
             # Perk seçimi hem klavye hem fare tıklamasıyla
@@ -185,10 +198,13 @@ def main():
 
             if oyun_ekrani.oyuncu_oldu_mu:
                 oyun_bitti.ayarla(oyun_ekrani.son_puan, oyun_ekrani.dalga_no, oyun_ekrani.yuksek_skorlar)
+                ses_sis.oynat("oyuncu_olum")
+                ses_sis.ambiyans_durdur()
                 durum = DURUM_BITTI
                 _fare_durumu_ayarla(aktif_oyun=False)
             elif oyun_ekrani.dalga_bitti_mi:
                 durum = DURUM_SHOP
+                ses_sis.duraksat()
                 _fare_durumu_ayarla(aktif_oyun=False)
 
         elif durum == DURUM_SHOP:
