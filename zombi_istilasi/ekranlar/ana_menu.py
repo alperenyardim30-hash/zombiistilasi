@@ -92,7 +92,10 @@ class AnaMenu:
     # ----------------------------------------------------------
     def _ciz_alt_bilgi(self, ekran):
         ipucu = self.font_alt.render("WASD:Hareket | Fare:Nisan | Sol Tik:Ates | ESC:Duraklat | B:Magaza", True, (100, 140, 100))
-        ekran.blit(ipucu, (GENISLIK // 2 - ipucu.get_width() // 2, YUKSEKLIK - 50))
+        ekran.blit(ipucu, (GENISLIK // 2 - ipucu.get_width() // 2, YUKSEKLIK - 65))
+        
+        yapimci = self.font_alt.render("OPEN BETA - Alperen ve Bahadir tarafindan yapildi", True, (180, 180, 50))
+        ekran.blit(yapimci, (GENISLIK // 2 - yapimci.get_width() // 2, YUKSEKLIK - 30))
 
     # ----------------------------------------------------------
     def tik_isle(self, event, yuksek_skor):

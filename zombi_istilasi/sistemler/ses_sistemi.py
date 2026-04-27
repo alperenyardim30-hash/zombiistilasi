@@ -89,10 +89,19 @@ class SesSistemi:
         self.sesler = {}
         self._ambiyans_kanal = None
         try:
+            import sys
             pygame.mixer.init(frequency=44100, size=-16, channels=2, buffer=512)
             pygame.mixer.set_num_channels(32)
-            # Proje koku zombiistilasi/ ya da zombi_istilasi/ altından çalışabilir
+            
+            # PyInstaller exe ici dosya cikarimi (MEIPASS) destegi
+            if hasattr(sys, '_MEIPASS'):
+                base_path = sys._MEIPASS
+            else:
+                base_path = os.path.abspath(".")
+
             _adaylar = [
+                os.path.join(base_path, "assets", "sounds"),
+                os.path.join(base_path, "..", "assets", "sounds"),
                 os.path.join("assets", "sounds"),
                 os.path.join("..", "assets", "sounds"),
             ]

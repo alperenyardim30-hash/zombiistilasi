@@ -21,7 +21,7 @@ def _ekran_boyutu_al():
 GENISLIK, YUKSEKLIK = _ekran_boyutu_al()
 
 FPS = 60  # 2D top-down oyun icin 60 FPS yeterli, CPU kullanimi 1/3'e duser
-BASLIK = "🧟 Zombi İstilası — 100+ Dev Güncelleme!"
+BASLIK = "🧟 Zombi İstilası - OPEN BETA (Alperen ve Bahadır tarafından yapıldı)"
 
 # Renkler
 SIYAH      = (0, 0, 0)

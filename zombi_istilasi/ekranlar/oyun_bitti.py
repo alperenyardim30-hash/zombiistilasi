@@ -53,6 +53,9 @@ class OyunBitti:
         self._ciz_buton(ekran, "TEKRAR OYNA", GENISLIK // 2, 530, YESIL)
         self._ciz_buton(ekran, "ANA MENÜ",    GENISLIK // 2, 600, (100, 150, 220))
 
+        yapimci = self.font_kucuk.render("OPEN BETA - Alperen ve Bahadir tarafindan yapildi", True, (180, 180, 50))
+        ekran.blit(yapimci, (GENISLIK // 2 - yapimci.get_width() // 2, YUKSEKLIK - 40))
+
     # ----------------------------------------------------------
     def _ciz_buton(self, ekran, metin, cx, cy, renk):
         fare = pygame.mouse.get_pos()

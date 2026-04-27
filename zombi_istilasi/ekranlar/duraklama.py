@@ -24,6 +24,9 @@ class Duraklama:
         self._ciz_buton(ekran, "ANA MENU",  GENISLIK // 2, 420, (100, 150, 220))
         self._ciz_buton(ekran, "CIKIS",     GENISLIK // 2, 500, KIRMIZI)
 
+        yapimci = self.font_orta.render("OPEN BETA - Alperen ve Bahadir tarafindan yapildi", True, (180, 180, 50))
+        ekran.blit(yapimci, (GENISLIK // 2 - yapimci.get_width() // 2, YUKSEKLIK - 50))
+
     # ----------------------------------------------------------
     def _ciz_buton(self, ekran, metin, cx, cy, renk):
         fare = pygame.mouse.get_pos()
