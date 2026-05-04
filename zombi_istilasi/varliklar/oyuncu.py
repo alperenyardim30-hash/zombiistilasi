@@ -13,8 +13,9 @@ from ayarlar import (
 )
 from varliklar.mermi import Mermi
 from sistemler.ses_sistemi import ses_sis
+import ayarlar
 
-ZORLUK_CARPANI = 1.0
+# ses_sis döngü içinde import edilmez — modül düzeyinde tek kez yüklenir
 
 class Oyuncu(pygame.sprite.Sprite):
     def __init__(self, x, y):
@@ -39,20 +40,27 @@ class Oyuncu(pygame.sprite.Sprite):
         self.hasar_sayac = 0.0
         self.hasarli_sayac = 0.0
         self.oldu = False
+        self._son_hareket = False
+        self.god_mode = False
+        self._ult_flash = 0.0
 
         self.envanter = ["tabanca"]
         self.aktif_silah = "tabanca"
         self.mermiler = {"tabanca": -1}
+        self.raycast_kuyrugu = []  # Raycast silahlar icin: [{ x, y, aci, veri, carpan }]
 
         self.yukseltmeler = {
             "can": 0, "stamina": 0, "hiz": 0, "hasar": 0, 
             "kalkan": 0, "zirh": 0, "ult_cd": 0, "combo": 0, "mermi": 0
         }
-        self.ult_bekleme = 0.0
+        self.ult_bekleme = self.ult_max_cd
         
         self.durbunler = ["red_dot"] # Varsayılan olarak Red Dot olsun
         self.aktif_durbun = "red_dot"
         self.guncel_zoom = 1.0
+        self.recoil = 0.0
+        self.guncel_yayilma = 0.0
+        self.silah_sprite = None
 
         self._image_olustur()
         self.rect = self.image.get_rect(center=(int(self.x), int(self.y)))
@@ -64,15 +72,60 @@ class Oyuncu(pygame.sprite.Sprite):
         pygame.draw.circle(self.image, (0, 0, 0, 80), (cx + 3, cy + 3), self.yari_cap)
         pygame.draw.circle(self.image, MAVI, (cx, cy), self.yari_cap)
         pygame.draw.circle(self.image, (120, 180, 255), (cx, cy), self.yari_cap - 6)
-        pygame.draw.rect(self.image, BEYAZ, (cx, cy - 3, self.yari_cap + 12, 6))
         self._base_image = self.image.copy()
+        self._silah_sprite_guncelle()
+
+    def _silah_sprite_guncelle(self):
+        """Aktif silaha göre oyuncunun elindeki silahın 2D görünümünü üret."""
+        veri = self.silah_verisi
+        tip = veri.get("tip", "normal")
+        renk = veri.get("renk", BEYAZ)
+
+        govde_uz = self.yari_cap + 12
+        govde_yuk = 6
+
+        if tip in ("roket", "seken_bomba", "delici_patlayan"):
+            govde_uz, govde_yuk = self.yari_cap + 18, 9
+        elif tip == "alev":
+            govde_uz, govde_yuk = self.yari_cap + 14, 8
+        elif tip == "delici":
+            govde_uz, govde_yuk = self.yari_cap + 20, 5
+
+        silah = pygame.Surface((govde_uz + 12, max(20, govde_yuk + 12)), pygame.SRCALPHA)
+        merkez_y = silah.get_height() // 2
+
+        # Namlu ve gövde
+        pygame.draw.rect(silah, (25, 25, 35), (2, merkez_y - govde_yuk // 2, govde_uz, govde_yuk), border_radius=3)
+        pygame.draw.rect(
+            silah,
+            (max(0, renk[0] - 40), max(0, renk[1] - 40), max(0, renk[2] - 40)),
+            (2 + govde_uz // 3, merkez_y - govde_yuk // 2, govde_uz // 2, govde_yuk),
+            border_radius=3
+        )
+        pygame.draw.circle(silah, renk, (govde_uz + 4, merkez_y), max(2, govde_yuk // 2))
+
+        # Özel silah eki
+        if tip == "alev":
+            pygame.draw.circle(silah, (255, 120, 0, 160), (govde_uz + 7, merkez_y), govde_yuk + 2)
+        elif tip in ("roket", "seken_bomba", "delici_patlayan"):
+            pygame.draw.polygon(
+                silah,
+                (90, 90, 100),
+                [(4, merkez_y), (0, merkez_y - 4), (0, merkez_y + 4)]
+            )
+        elif tip == "delici":
+            pygame.draw.line(silah, (180, 220, 255), (govde_uz - 6, merkez_y), (govde_uz + 10, merkez_y), 1)
+
+        self.silah_sprite = silah
 
     @property
     def gercek_hiz(self): return OYUNCU_HIZ + self.yukseltmeler["hiz"] * 30
     @property
     def hasar_carpani(self): return 1.0 + self.yukseltmeler["hasar"] * 0.30
     @property
-    def zirh_carpani(self): return max(0.2, 1.0 - self.yukseltmeler["zirh"] * 0.12) * ZORLUK_CARPANI
+    def max_can_degeri(self): return self.max_can + self.yukseltmeler["can"] * 40
+    @property
+    def zirh_carpani(self): return max(0.2, 1.0 - self.yukseltmeler["zirh"] * 0.12)
     @property
     def max_kalkan_degeri(self): return self.max_kalkan + self.yukseltmeler["kalkan"] * 40
     @property
@@ -94,10 +147,12 @@ class Oyuncu(pygame.sprite.Sprite):
             self.envanter.append(silah_key)
             self.mermiler[silah_key] = self._silah_max_mermi(silah_key)
         self.aktif_silah = silah_key
+        self._silah_sprite_guncelle()
 
     def silah_degistir(self, silah_key):
         if silah_key in self.envanter:
             self.aktif_silah = silah_key
+            self._silah_sprite_guncelle()
 
     def mermileri_fulle(self):
         for s in self.envanter:
@@ -114,40 +169,57 @@ class Oyuncu(pygame.sprite.Sprite):
         if not self.envanter: return
         idx = self.envanter.index(self.aktif_silah) if self.aktif_silah in self.envanter else 0
         self.aktif_silah = self.envanter[(idx + yon) % len(self.envanter)]
+        self._silah_sprite_guncelle()
 
     def update(self, dt, tuslar, fare_pos, mermiler, ekran_w, ekran_h, serbest_bakis=False):
+        # Adrenalin perki — hasar alınca 3 saniye hız bonusu
+        if getattr(self, '_adrenalin_sayac', 0) > 0:
+            self._adrenalin_sayac -= dt
+            hiz_bonus = 1.2
+        else:
+            hiz_bonus = 1.0
+
         sprint = tuslar.get("sprint", False)
         nisan = tuslar.get("nisan", False)
         
-        # Sağ tık (Nişan Alma) mekaniği
+        # Yayılma ve Nişan Mekaniği
         from ayarlar import DURBUNLER
+        hedef_yayilma = self.silah_verisi["yayilma"]
+
         if nisan:
             hiz_carpani = 0.4
-            # Dürbün zoomunu uygula
             d_veri = DURBUNLER.get(self.aktif_durbun, {"zoom": 1.0})
             self.guncel_zoom = d_veri["zoom"]
-            self.guncel_yayilma = self.silah_verisi["yayilma"] * (0.1 / self.guncel_zoom)
+            hedef_yayilma = self.silah_verisi["yayilma"] * (0.2 / self.guncel_zoom)
         elif sprint and self.stamina > 0 and not self.yoruldu_mu:
             self.stamina -= OYUNCU_STAMINA_HARCAMA * dt
             if self.stamina <= 0:
                 self.stamina = 0
                 self.yoruldu_mu = True
             hiz_carpani = OYUNCU_SPRINT_CARPAN
-            self.guncel_yayilma = self.silah_verisi["yayilma"] * 1.5 
+            hedef_yayilma = self.silah_verisi["yayilma"] * 2.5 
             self.guncel_zoom = 1.0
         else:
             hiz_carpani = 1.0
             self.stamina = min(self.max_stamina_degeri, self.stamina + OYUNCU_STAMINA_REGEN * dt)
             if self.stamina > 25:
                 self.yoruldu_mu = False
-            self.guncel_yayilma = self.silah_verisi["yayilma"]
             self.guncel_zoom = 1.0
+            if self.hareket_ediyor_mu:
+                hedef_yayilma = self.silah_verisi["yayilma"] * 1.5
+
+        # Recoil ekle ve yumuşak geçiş sağla (Sync Cone)
+        hedef_yayilma += self.recoil
+        self.guncel_yayilma += (hedef_yayilma - self.guncel_yayilma) * 15.0 * dt
+        
+        # Recoil'in zamanla azalması (Soğuma)
+        self.recoil = max(0.0, self.recoil - (10.0 + self.recoil * 3.0) * dt)
         
         # 3D modunda hareket oyuncunun baktığı yöne göre olmalı!
         if serbest_bakis:
-            self._hareket_3d(dt, tuslar, ekran_w, ekran_h, hiz_carpani)
+            self._hareket_3d(dt, tuslar, ekran_w, ekran_h, hiz_carpani * hiz_bonus)
         else:
-            self._hareket(dt, tuslar, ekran_w, ekran_h, hiz_carpani)
+            self._hareket(dt, tuslar, ekran_w, ekran_h, hiz_carpani * hiz_bonus)
             
         self._don(fare_pos, serbest_bakis)
         
@@ -164,7 +236,7 @@ class Oyuncu(pygame.sprite.Sprite):
         if tuslar.get("ates") and self.ates_sayac <= 0:
             mevcut_mermi = self.mermiler.get(self.aktif_silah, -1)
             if mevcut_mermi > 0 or mevcut_mermi == -1:
-                self._ates(mermiler)
+                self._ates(mermiler, perk_sis=getattr(self, '_perk_sis_ref', None))
             else:
                 self.siradaki_silah()
             
@@ -183,6 +255,22 @@ class Oyuncu(pygame.sprite.Sprite):
         self.x += dx * v * dt
         self.y += dy * v * dt
         self._son_hareket = (dx != 0 or dy != 0)
+        
+        sprint_aktif = tuslar.get("sprint", False) and self.stamina > 0 and not self.yoruldu_mu
+        self._ayak_sayac = getattr(self, '_ayak_sayac', 0) - dt
+        if (dx != 0 or dy != 0) and self._ayak_sayac <= 0:
+            ses_sis.oynat("ayak_sesi", volume=0.3)
+            self._ayak_sayac = 0.35 if not sprint_aktif else 0.2
+            
+        if sprint_aktif and (dx != 0 or dy != 0):
+            self._iz_sayac = getattr(self, '_iz_sayac', 0) + dt
+            if self._iz_sayac >= 0.06:
+                self._iz_sayac = 0
+                self._iz_konumlar = getattr(self, '_iz_konumlar', [])
+                self._iz_konumlar.append((self.x, self.y, pygame.time.get_ticks()))
+                if len(self._iz_konumlar) > 8:
+                    self._iz_konumlar.pop(0)
+                    
         self.x = max(self.yari_cap, min(ekran_w - self.yari_cap, self.x))
         self.y = max(self.yari_cap, min(ekran_h - self.yari_cap, self.y))
 
@@ -224,6 +312,9 @@ class Oyuncu(pygame.sprite.Sprite):
             self.aci = math.degrees(math.atan2(dy, dx))
         
         img = self._base_image.copy()
+        if self.silah_sprite:
+            silah_y = img.get_height() // 2 - self.silah_sprite.get_height() // 2
+            img.blit(self.silah_sprite, (img.get_width() // 2 - 2, silah_y))
         if self.kalkan > 0:
             alpha = int(100 * (self.kalkan / self.max_kalkan_degeri))
             hale = pygame.Surface((img.get_width(), img.get_height()), pygame.SRCALPHA)
@@ -233,19 +324,39 @@ class Oyuncu(pygame.sprite.Sprite):
         self.rect = self.image.get_rect(center=(int(self.x), int(self.y)))
 
     def ciz_nisangah(self, ekran, fare_pos, ox=0, oy=0):
-        # Koni çizimi
+        # Koni her zaman aktif, silahın ve hareketin durumuna göre dinamik değişecek
         veri = self.silah_verisi
         yayilma = getattr(self, "guncel_yayilma", veri["yayilma"])
-        uzunluk = min(1200, veri["mermi_hizi"])
+        tip = veri.get("tip", "normal")
+        uzunluk = min(1400, veri["mermi_hizi"])
+        if tip == "alev":
+            uzunluk = min(500, veri["mermi_hizi"] + 120)
+        elif tip in ("roket", "seken_bomba", "delici_patlayan"):
+            uzunluk = min(900, veri["mermi_hizi"] + 250)
+        elif tip == "delici":
+            uzunluk = min(1600, veri["mermi_hizi"] + 300)
         
         merkez_x = self.x + ox
         merkez_y = self.y + oy
         
+        # Namlu ucunun (gun barrel) konumu
+        namlu_x = merkez_x + math.cos(math.radians(self.aci)) * (self.yari_cap + 12)
+        namlu_y = merkez_y + math.sin(math.radians(self.aci)) * (self.yari_cap + 12)
+        
+        koni_alpha = 28
+        cizgi_alpha = 80
+        if tip == "alev":
+            koni_alpha = 55
+        elif tip in ("roket", "seken_bomba", "delici_patlayan"):
+            koni_alpha = 35
+        elif tip == "delici":
+            cizgi_alpha = 120
+
         # Eğer yayılma yoksa veya nişan alınıyorsa tek bir ince lazer çizgisi çiz
         if yayilma < 1.0:
             dx = math.cos(math.radians(self.aci)) * uzunluk
             dy = math.sin(math.radians(self.aci)) * uzunluk
-            pygame.draw.line(ekran, (*veri["renk"], 150), (merkez_x, merkez_y), (merkez_x + dx, merkez_y + dy), 2)
+            pygame.draw.line(ekran, (*veri["renk"], 160), (namlu_x, namlu_y), (namlu_x + dx, namlu_y + dy), 2)
         else:
             # Yayılma açısına göre yarı saydam bir üçgen/koni oluştur
             # Performans için özel bir Surface
@@ -259,54 +370,104 @@ class Oyuncu(pygame.sprite.Sprite):
             p2 = (cx + math.cos(aci1)*uzunluk, cy + math.sin(aci1)*uzunluk)
             p3 = (cx + math.cos(aci2)*uzunluk, cy + math.sin(aci2)*uzunluk)
             
-            pygame.draw.polygon(koni_s, (*veri["renk"], 30), [p1, p2, p3])
+            pygame.draw.polygon(koni_s, (*veri["renk"], koni_alpha), [p1, p2, p3])
             
             # Koni kenarları
-            pygame.draw.line(koni_s, (*veri["renk"], 80), p1, p2, 1)
-            pygame.draw.line(koni_s, (*veri["renk"], 80), p1, p3, 1)
+            pygame.draw.line(koni_s, (*veri["renk"], cizgi_alpha), p1, p2, 1)
+            pygame.draw.line(koni_s, (*veri["renk"], cizgi_alpha), p1, p3, 1)
             
-            ekran.blit(koni_s, (int(merkez_x - cx), int(merkez_y - cy)))
+            ekran.blit(koni_s, (int(namlu_x - cx), int(namlu_y - cy)))
 
-    def _ates(self, mermiler):
+        # Namlu merkezine ufak hedef noktası
+        pygame.draw.circle(ekran, veri["renk"], (int(namlu_x), int(namlu_y)), 2)
+
+    def _ates(self, mermiler, perk_sis=None):
         veri = self.silah_verisi
         adeti = veri["mermi_adeti"]
+        # PERK: ikiz_namlu — mermi adedini ikiye katla
+        if perk_sis and perk_sis.ikiz_namlu_mu():
+            adeti *= 2
         yayilma = getattr(self, "guncel_yayilma", veri["yayilma"])
+        gorsel_tip = veri.get("gorsel_tip", "normal")
+
         if self.aktif_silah != "tabanca":
             self.mermiler[self.aktif_silah] -= 1
+
+        # Mermilerin çıkış noktası (Namlunun ucu)
+        namlu_x = self.x + math.cos(math.radians(self.aci)) * (self.yari_cap + 12)
+        namlu_y = self.y + math.sin(math.radians(self.aci)) * (self.yari_cap + 12)
             
         for i in range(adeti):
-            aci_offset = 0.0 if adeti == 1 else random.uniform(-yayilma / 2, yayilma / 2)
-            m = Mermi(self.x, self.y, self.aci + aci_offset, veri, self.hasar_carpani)
-            mermiler.add(m)
+            # Artık tek mermi de olsa yayılma (recoil/hareket) etki ediyor
+            aci_offset = random.uniform(-yayilma / 2, yayilma / 2)
+            aci_final = self.aci + aci_offset
+
+            if gorsel_tip == "raycast":
+                # Anlik isin — Mermi olusturmaz, kuyruga ekler
+                self.raycast_kuyrugu.append({
+                    "x": namlu_x, "y": namlu_y,
+                    "aci": aci_final, "veri": veri,
+                    "carpan": self.hasar_carpani
+                })
+            else:
+                m = Mermi(namlu_x, namlu_y, aci_final, veri, self.hasar_carpani)
+                if perk_sis and 'bumerang' in perk_sis.aktif_perkler:
+                    m.bumerang = True
+                    m.dondu = False
+                mermiler.add(m)
+            
         self.ates_sayac = veri["ates_hizi"]
         
-        # Silah sesini tipine göre seç (Profesyonel Mapping)
-        ses_anahtar = "ates"
-        if "ak47" in self.aktif_silah:    ses_anahtar = "ates_ak"
-        elif "smg" in self.aktif_silah or "minigun" in self.aktif_silah: ses_anahtar = "ates_smg"
-        elif "shotgun" in self.aktif_silah: ses_anahtar = "ates_pom"
-        elif "sniper" in self.aktif_silah:  ses_anahtar = "ates_sni"
-        elif "lazer" in self.aktif_silah or "plazma" in self.aktif_silah: ses_anahtar = "ates_laz"
-        elif "alev" in self.aktif_silah:   ses_anahtar = "ates_ale"
-        elif "bomba" in self.aktif_silah or "roket" in self.aktif_silah: ses_anahtar = "ates_pat"
+        # Silaha göre Recoil (Geri tepme) ekle
+        self.recoil += veri["yayilma"] * 0.8 + 2.0
+        self.recoil = min(self.recoil, 45.0) # Maksimum recoil sınırı
         
+        # Silah sesini tipine göre seç (Profesyonel Mapping)
+        gorsel_tip = veri.get("gorsel_tip", "normal")
+        ses_map = {
+            "raycast": "ates_laz",
+            "alev_koni": "ates_ale",
+            "roket_fuze": "ates_pat",
+            "pellet": "ates_pom",
+            "delici_serit": "ates_sni",
+            "iyon_top": "ates_laz",
+            "void_dalgasi": "ates_laz",
+            "efsane_isin": "ates_laz",
+            "the_end_isin": "ates_pat",
+            "elektrik_ark": "ates_laz",
+            "plazma_top": "ates_laz",
+        }
+        ses_anahtar = ses_map.get(gorsel_tip, "ates_ak" if "ak" in self.aktif_silah else "ates_smg" if veri["ates_hizi"] < 0.1 else "ates")
         ses_sis.oynat(ses_anahtar)
+        
+        mevcut = self.mermiler.get(self.aktif_silah, -1)
+        kapasite = self._silah_max_mermi(self.aktif_silah)
+        if kapasite != -1 and mevcut == 0:
+            ses_sis.oynat("silah_bos")
+        elif kapasite != -1 and mevcut <= int(kapasite * 0.15) and mevcut > 0:
+            ses_sis.oynat("silah_bos", volume=0.3)
 
     def _ultimate_kullan(self, mermiler):
         self.ult_bekleme = self.ult_max_cd
-        veri = SILAHLAR["roket_ateş"].copy() if "roket_ateş" in SILAHLAR else SILAHLAR["tabanca"].copy()
-        veri["mermi_hizi"] = 700
-        veri["tip"] = "delici_patlayan"
-        veri["hasar"] = 200
-        veri["renk"] = SARI
-        veri["patlama_r"] = 120
-        veri["efekt"] = "yanma"
+        self._ult_flash = 0.3
+        baz = SILAHLAR.get("roket", SILAHLAR["tabanca"]).copy()
+        baz["mermi_hizi"] = 700
+        baz["tip"] = "delici_patlayan"
+        baz["hasar"] = 300
+        baz["renk"] = SARI
+        baz["patlama_r"] = 140
+        baz["efekt"] = "yok"
+        baz["gorsel_tip"] = "roket_fuze"
+        baz["mermi_adeti"] = 1
         for i in range(16):
             aci = i * 22.5
-            m = Mermi(self.x, self.y, aci, veri, self.hasar_carpani * 2.0)
+            m = Mermi(self.x, self.y, aci, baz, self.hasar_carpani * 2.0)
             mermiler.add(m)
 
     def hasar_al(self, miktar):
+        if getattr(self, "god_mode", False):
+            return  # Ölümsüzlük (God Mode) aciksa hasar alma
+            
         gercek = miktar * self.zirh_carpani
         if self.kalkan > 0:
             if self.kalkan >= gercek:
@@ -315,12 +476,18 @@ class Oyuncu(pygame.sprite.Sprite):
             else:
                 gercek -= self.kalkan
                 self.kalkan = 0
+                if hasattr(self, '_perk_sis_ref') and self._perk_sis_ref:
+                    if 'kalkan_pat' in self._perk_sis_ref.aktif_perkler:
+                        self._kalkan_patlama_flag = True
         if gercek > 0:
             self.can -= gercek
-            ses_sis.oynat("hasar")
+            ses_sis.oyuncu_hasar_sesi_oynat()
             
         self.hasarli_sayac = OYUNCU_HASAR_FLASH
         self.kalkan_yenilenme_sayaci = OYUNCU_KALKAN_GECIKME
+        # PERK: hasar alındığında perk efektleri uygula
+        if hasattr(self, '_perk_sis_ref') and self._perk_sis_ref:
+            self._perk_sis_ref.uygula_hasar_alindi(self)
         if self.can <= 0:
             self.can = 0
             self.oldu = True
@@ -339,13 +506,18 @@ class Oyuncu(pygame.sprite.Sprite):
     def flash_ciz(self, ekran):
         if self.hasarli_sayac > 0:
             alpha = int(180 * (self.hasarli_sayac / OYUNCU_HASAR_FLASH))
-            flash = pygame.Surface(ekran.get_size(), pygame.SRCALPHA)
-            flash.fill((255, 0, 0, alpha) if self.kalkan <= 0 else (100, 150, 255, alpha))
-            ekran.blit(flash, (0, 0))
+            if not hasattr(self, "_flash_surf_1x1"):
+                self._flash_surf_1x1 = pygame.Surface((1, 1), pygame.SRCALPHA)
+            renk = (255, 0, 0, alpha) if self.kalkan <= 0 else (100, 150, 255, alpha)
+            self._flash_surf_1x1.set_at((0, 0), renk)
+            scaled_flash = pygame.transform.scale(self._flash_surf_1x1, ekran.get_size())
+            ekran.blit(scaled_flash, (0, 0))
             
-        oran = self.can / (self.max_can + self.yukseltmeler["can"]*40)
+        oran = self.can / self.max_can_degeri
         if oran < 0.35:
             alpha = int(255 * (1.0 - oran/0.35)) * abs(math.sin(pygame.time.get_ticks() / 150))
-            vignette = pygame.Surface(ekran.get_size(), pygame.SRCALPHA)
-            pygame.draw.rect(vignette, (255, 0, 0, int(alpha*0.4)), vignette.get_rect(), 40)
-            ekran.blit(vignette, (0, 0))
+            if not hasattr(self, "_vignette_surf") or self._vignette_surf.get_size() != ekran.get_size():
+                self._vignette_surf = pygame.Surface(ekran.get_size(), pygame.SRCALPHA)
+                pygame.draw.rect(self._vignette_surf, (255, 0, 0, 255), self._vignette_surf.get_rect(), 40)
+            self._vignette_surf.set_alpha(int(alpha*0.4))
+            ekran.blit(self._vignette_surf, (0, 0))

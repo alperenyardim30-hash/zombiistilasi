@@ -1,315 +1,341 @@
-# ============================================================
-#  ekranlar/shop.py — Scroll Özellikli 60+ Silah Mağazası
-# ============================================================
 import pygame
-import math
+import random
 from ayarlar import (
     GENISLIK, YUKSEKLIK, BEYAZ, SIYAH, KIRMIZI, YESIL,
-    SARI, ALTIN, ACIK_GRI, KOYU_GRI, MOR, CAMGOBEGI, PEMBE,
+    SARI, ALTIN, CAMGOBEGI,
     SILAHLAR, SILAH_SIRASI, YUKSELTMELER, DURBUNLER
 )
+from sistemler.ses_sistemi import ses_sis
+
+# Silah kategorileri
+KATEGORILER = [
+    ("TABANCA",   ["cift","revolver","deagle","glock18","mateba"]),
+    ("SMG",       ["smg","vector","pp90","bizon"]),
+    ("TUFEK",     ["ak47","m4a1","aug","scar","famas","an94","galil"]),
+    ("SHOTGUN",   ["shotgun","aa12","ksg","spas","striker","saiga"]),
+    ("SNIPER",    ["sniper","awm","barrett","intervention","cheytac"]),
+    ("LAZER",     ["lazer","lazer_mk2","ion","taser_xl","phaser"]),
+    ("PLAZMA",    ["plazma","plazma_mk2","void","antimatter"]),
+    ("AGIR",      ["minigun","vulcan","chaingun"]),
+    ("ALEV",      ["alev","napalm","drakon"]),
+    ("PATLAYICI", ["bomba","roket","thermobarik","rail","thor","orbital"]),
+    ("EFSANEVI",  ["widowmaker","apocalypse","zeus","mjolnir","nemesis","the_end"]),
+]
 
 class Shop:
     def __init__(self):
-        self.font_baslik = pygame.font.SysFont("Impact", 46)
-        self.font_kart   = pygame.font.SysFont("Consolas", 15, bold=True)
-        self.font_kucuk  = pygame.font.SysFont("Consolas", 13)
-        self.font_buton  = pygame.font.SysFont("Consolas", 24, bold=True)
+        self.font_baslik = pygame.font.SysFont("Impact", 40)
+        self.font_kart   = pygame.font.SysFont("Consolas", 14, bold=True)
+        self.font_kucuk  = pygame.font.SysFont("Consolas", 12)
+        self.font_buton  = pygame.font.SysFont("Consolas", 22, bold=True)
         self.mesaj = ""
         self.mesaj_sayac = 0.0
         self.zaman = 0.0
-        
-        self.kaydirma_y = 0
-        self.hedef_kaydirma_y = 0
+        self.scroll_y = 0
+        self.hedef_scroll = 0
+        self.aktif_kategori = 0
+        # Firsat sistemi
+        self.firsat_silahlar = []
+        self.firsat_carpani = 0.6
+        self.firsat_yenile()
+
+    def firsat_yenile(self):
+        havuz = [k for k in SILAH_SIRASI if k != "tabanca"]
+        self.firsat_silahlar = random.sample(havuz, min(3, len(havuz)))
 
     def guncelle(self, dt):
         self.zaman += dt
         if self.mesaj_sayac > 0:
             self.mesaj_sayac -= dt
-            
-        # Yumuşak kaydırma
-        self.kaydirma_y += (self.hedef_kaydirma_y - self.kaydirma_y) * 15 * dt
+        self.scroll_y += (self.hedef_scroll - self.scroll_y) * min(1.0, 12 * dt)
 
+    def _mesaj(self, txt):
+        self.mesaj = txt
+        self.mesaj_sayac = 2.5
+
+    # ── CIZ ──────────────────────────────────────────────────
     def ciz(self, ekran, oyuncu, puan_sis):
-        ekran.fill((14, 18, 22))
-        self._ciz_arkaplan(ekran)
-        
-        # İçerik için ayrı yüzey (kaydırma için)
-        icerik_yuzey = pygame.Surface((GENISLIK, max(YUKSEKLIK, 2800)), pygame.SRCALPHA)
-        self._ciz_silahlar(icerik_yuzey, oyuncu, puan_sis)
-        self._ciz_yukseltmeler(icerik_yuzey, oyuncu, puan_sis)
-        self._ciz_durbunler(icerik_yuzey, oyuncu, puan_sis)
-        
-        ekran.blit(icerik_yuzey, (0, self.kaydirma_y))
-        
-        # Sabit UI elemanları (Üst başlık ve alt buton)
-        self._ciz_ust_bar(ekran, puan_sis)
-        self._ciz_devam_buton(ekran)
-        
+        ekran.fill((12, 14, 18))
+        # Ust bar
+        pygame.draw.rect(ekran, (18, 22, 30), (0, 0, GENISLIK, 60))
+        t = self.font_baslik.render("-- MAGAZIN --", True, SARI)
+        ekran.blit(t, (GENISLIK//2 - t.get_width()//2, 8))
+        pt = self.font_kart.render(f"PARA: {puan_sis.para}$", True, ALTIN)
+        ekran.blit(pt, (GENISLIK - pt.get_width() - 20, 20))
+
+        # Kategori sekmeleri (sol panel)
+        self._ciz_kategoriler(ekran)
+
+        # Icerik alani (sag)
+        clip = pygame.Rect(180, 65, GENISLIK - 195, YUKSEKLIK - 140)
+        ekran.set_clip(clip)
+        self._ciz_silahlar(ekran, oyuncu, puan_sis, clip)
+        ekran.set_clip(None)
+
+        # Yukseltme + durbun alt panel
+        self._ciz_alt_panel(ekran, oyuncu, puan_sis)
+
+        # Devam butonu
+        self._ciz_devam_butonu(ekran)
+
+        # Mesaj
         if self.mesaj_sayac > 0:
-            self._ciz_mesaj(ekran)
+            mt = self.font_kart.render(self.mesaj, True, YESIL)
+            ekran.blit(mt, (GENISLIK//2 - mt.get_width()//2, YUKSEKLIK - 30))
 
-    def _ciz_arkaplan(self, ekran):
-        for i in range(0, GENISLIK, 80):
-            pygame.draw.line(ekran, (20, 24, 28), (i, 0), (i, YUKSEKLIK), 1)
-        for j in range(int(self.kaydirma_y) % 80, YUKSEKLIK, 80):
-            pygame.draw.line(ekran, (20, 24, 28), (0, j), (GENISLIK, j), 1)
+    def _ciz_kategoriler(self, ekran):
+        bx, by = 5, 70
+        bw, bh = 165, 32
+        for i, (isim, _) in enumerate(KATEGORILER):
+            aktif = i == self.aktif_kategori
+            bg = (40, 55, 70) if aktif else (22, 26, 34)
+            border = SARI if aktif else (50, 55, 65)
+            rect = pygame.Rect(bx, by + i * (bh + 4), bw, bh)
+            pygame.draw.rect(ekran, bg, rect, border_radius=6)
+            pygame.draw.rect(ekran, border, rect, 2, border_radius=6)
+            t = self.font_kucuk.render(isim, True, SARI if aktif else (160,160,160))
+            ekran.blit(t, (rect.x + 10, rect.y + 8))
 
-    def _ciz_ust_bar(self, ekran, puan_sis):
-        # Üst bar arkaplanı
-        pygame.draw.rect(ekran, (10, 10, 15, 230), (0, 0, GENISLIK, 80))
-        pygame.draw.line(ekran, PEMBE, (0, 80), (GENISLIK, 80), 2)
-        
-        t = self.font_baslik.render("KARA BORSA", True, PEMBE)
-        ekran.blit(t, (40, 15))
-        
-        para_kutu = pygame.Surface((240, 50), pygame.SRCALPHA)
-        pygame.draw.rect(para_kutu, (0, 0, 0, 150), (0, 0, 240, 50), border_radius=12)
-        pygame.draw.rect(para_kutu, ALTIN, (0, 0, 240, 50), 2, border_radius=12)
-        ekran.blit(para_kutu, (GENISLIK - 280, 15))
-        
-        para_t = self.font_baslik.render(f"💰 {puan_sis.para}", True, SARI)
-        ekran.blit(para_t, (GENISLIK - 160 - para_t.get_width() // 2, 16))
-
-    def _ciz_silahlar(self, ekran, oyuncu, puan_sis):
-        baslik = self.font_baslik.render("— YENİ NESİL SİLAHLAR —", True, CAMGOBEGI)
-        ekran.blit(baslik, (80, 120))
-
-        kart_gen, kart_yuk, bosluk = 200, 180, 20
-        bx, by = 80, 180
-        
-        fare_y = pygame.mouse.get_pos()[1] - self.kaydirma_y
-        fare_x = pygame.mouse.get_pos()[0]
-
-        for i, key in enumerate(SILAH_SIRASI):
-            if key == "tabanca": continue
-            idx = i - 1
-            row, col = idx // 4, idx % 4  # 4 sütun!
-            kx, ky = bx + col * (kart_gen + bosluk), by + row * (kart_yuk + bosluk)
-            
-            veri = SILAHLAR[key]
-            sahip = key in oyuncu.envanter
-            bg = (20, 35, 45) if sahip else (25, 25, 30)
-            border = veri["renk"] if sahip else (50, 50, 60)
-            
-            hover = pygame.Rect(kx, ky, kart_gen, kart_yuk).collidepoint(fare_x, fare_y)
-            if hover and not sahip: border = BEYAZ
-            
-            pygame.draw.rect(ekran, bg, (kx, ky, kart_gen, kart_yuk), border_radius=12)
-            pygame.draw.rect(ekran, border, (kx, ky, kart_gen, kart_yuk), 2, border_radius=12)
-
-            # Glow
-            pygame.draw.circle(ekran, (*veri["renk"], 50), (kx + kart_gen // 2, ky + 30), 22)
-            pygame.draw.circle(ekran, veri["renk"], (kx + kart_gen // 2, ky + 30), 12)
-
-            isim = self.font_kart.render(veri["isim"], True, BEYAZ)
-            ekran.blit(isim, (kx + kart_gen // 2 - isim.get_width() // 2, ky + 60))
-
-            y_off = 85
-            for line in veri["aciklama"]:
-                t = self.font_kucuk.render(f"• {line}", True, (180, 180, 180))
-                ekran.blit(t, (kx + 10, ky + y_off))
-                y_off += 16
-
-            if sahip:
-                t = self.font_kucuk.render("SAHİPSİN ✓", True, CAMGOBEGI)
-                ekran.blit(t, (kx + kart_gen // 2 - t.get_width() // 2, ky + kart_yuk - 25))
-            else:
-                karsi = puan_sis.para >= veri["fiyat"]
-                btn_renk = YESIL if karsi else (80, 50, 50)
-                self._mini_buton(ekran, f"{veri['fiyat']} 💰", kx + kart_gen // 2, ky + kart_yuk - 22, btn_renk)
-
-    def _ciz_yukseltmeler(self, ekran, oyuncu, puan_sis):
-        baslik = self.font_baslik.render("— BİYONİK GELİŞTİRMELER —", True, MOR)
-        bx, by = GENISLIK - 600, 120
-        ekran.blit(baslik, (bx, 120))
-
-        kart_gen, kart_yuk, bosluk = 260, 110, 15
-
-        fare_y = pygame.mouse.get_pos()[1] - self.kaydirma_y
-        fare_x = pygame.mouse.get_pos()[0]
-
-        keys = list(YUKSELTMELER.keys())
-        for i, key in enumerate(keys):
-            veri = YUKSELTMELER[key]
-            row, col = i // 2, i % 2
-            ky = by + 60 + row * (kart_yuk + bosluk)
-            kx = bx + col * (kart_gen + bosluk)
-            
-            seviye = oyuncu.yukseltmeler.get(key, 0)
-            max_sev = veri["max_seviye"]
-            karsi = puan_sis.para >= veri["fiyat"]
-            maxed = seviye >= max_sev
-
-            bg = (35, 20, 45) if not maxed else (20, 35, 20)
-            border = MOR if not maxed else YESIL
-            
-            hover = pygame.Rect(kx, ky, kart_gen, kart_yuk).collidepoint(fare_x, fare_y)
-            if hover and not maxed: border = BEYAZ
-            
-            pygame.draw.rect(ekran, bg, (kx, ky, kart_gen, kart_yuk), border_radius=12)
-            pygame.draw.rect(ekran, border, (kx, ky, kart_gen, kart_yuk), 2, border_radius=12)
-
-            isim_t = self.font_kart.render(f"{veri['emoji']} {veri['isim']}", True, BEYAZ)
-            ekran.blit(isim_t, (kx + 12, ky + 12))
-
-            acik = self.font_kucuk.render(veri["aciklama"], True, (200, 180, 220))
-            ekran.blit(acik, (kx + 12, ky + 35))
-
-            # Seviye çubukları
-            bar_w = (kart_gen - 24) / max_sev - 4
-            for s in range(max_sev):
-                renk = MOR if s < seviye else (50, 40, 60)
-                pygame.draw.rect(ekran, renk, (kx + 12 + s * (bar_w + 4), ky + 60, bar_w, 8), border_radius=4)
-
-            if maxed:
-                btn_t = self.font_kucuk.render("MAKS ✓", True, YESIL)
-                ekran.blit(btn_t, (kx + kart_gen - btn_t.get_width() - 12, ky + kart_yuk - 25))
-            else:
-                self._mini_buton(ekran, f"Yükselt {veri['fiyat']}💰", kx + kart_gen - 70, ky + kart_yuk - 20, (180, 80, 255) if karsi else (80, 60, 100))
-
-    def _ciz_durbunler(self, ekran, oyuncu, puan_sis):
-        baslik = self.font_baslik.render("— OPTİK SİSTEMLER —", True, ALTIN)
-        bx, by = GENISLIK - 600, 680
-        ekran.blit(baslik, (bx, by))
-
-        kart_gen, kart_yuk, bosluk = 260, 80, 15
-        
-        fare_y = pygame.mouse.get_pos()[1] - self.kaydirma_y
-        fare_x = pygame.mouse.get_pos()[0]
-
-        keys = list(DURBUNLER.keys())
-        for i, key in enumerate(keys):
-            veri = DURBUNLER[key]
-            row, col = i // 2, i % 2
-            ky = by + 60 + row * (kart_yuk + bosluk)
-            kx = bx + col * (kart_gen + bosluk)
-            
-            sahip = key in oyuncu.durbunler
-            aktif = oyuncu.aktif_durbun == key
-            
-            bg = (40, 40, 20) if aktif else ((30, 30, 30) if sahip else (20, 20, 25))
-            border = ALTIN if aktif else (ACIK_GRI if sahip else (50, 50, 60))
-            
-            hover = pygame.Rect(kx, ky, kart_gen, kart_yuk).collidepoint(fare_x, fare_y)
-            if hover and not aktif: border = BEYAZ
-            
-            pygame.draw.rect(ekran, bg, (kx, ky, kart_gen, kart_yuk), border_radius=10)
-            pygame.draw.rect(ekran, border, (kx, ky, kart_gen, kart_yuk), 2, border_radius=10)
-
-            t = self.font_kart.render(f"{veri['emoji']} {veri['isim']}", True, BEYAZ)
-            ekran.blit(t, (kx + 12, ky + 15))
-            
-            if aktif:
-                st = self.font_kucuk.render("TAKILI ✓", True, ALTIN)
-                ekran.blit(st, (kx + kart_gen - st.get_width() - 12, ky + 45))
-            elif sahip:
-                self._mini_buton(ekran, "TAK", kx + kart_gen - 50, ky + 50, (100, 100, 120))
-            else:
-                karsi = puan_sis.para >= veri["fiyat"]
-                self._mini_buton(ekran, f"AL {veri['fiyat']}💰", kx + kart_gen - 70, ky + 50, (200, 180, 50) if karsi else (80, 70, 40))
-
-    def _mini_buton(self, ekran, metin, cx, cy, renk):
-        t = self.font_kucuk.render(metin, True, BEYAZ)
-        bw, bh = t.get_width() + 24, 32
-        bx, by = cx - bw // 2, cy - bh // 2
-        pygame.draw.rect(ekran, renk, (bx, by, bw, bh), border_radius=8)
-        ekran.blit(t, (cx - t.get_width() // 2, cy - t.get_height() // 2))
-
-    def _ciz_devam_buton(self, ekran):
+    def _ciz_silahlar(self, ekran, oyuncu, puan_sis, clip):
+        _, silah_keys = KATEGORILER[self.aktif_kategori]
+        kw, kh, gap = 200, 110, 12
+        cols = max(1, (clip.width - gap) // (kw + gap))
+        sx = clip.x + gap
+        sy = clip.y + gap - int(self.scroll_y)
         fare = pygame.mouse.get_pos()
-        bw, bh = 400, 70
-        bx, by = GENISLIK // 2 - bw // 2, YUKSEKLIK - 110
-        uzerinde = pygame.Rect(bx, by, bw, bh).collidepoint(fare)
-        
-        r = 60 + int(math.sin(self.zaman * 5) * 30)
-        renk = (r, 220, r + 50) if uzerinde else (20, 180, 50)
-        
-        pygame.draw.rect(ekran, renk, (bx, by, bw, bh), border_radius=16)
-        pygame.draw.rect(ekran, BEYAZ, (bx, by, bw, bh), 3, border_radius=16)
-        t = self.font_buton.render("▶  SAVAŞA GERİ DÖN", True, SIYAH if not uzerinde else BEYAZ)
-        ekran.blit(t, (GENISLIK // 2 - t.get_width() // 2, by + bh // 2 - t.get_height() // 2))
 
-    def _ciz_mesaj(self, ekran):
-        surf = self.font_kart.render(self.mesaj, True, BEYAZ)
-        alpha = int(255 * min(1.0, self.mesaj_sayac / 0.5))
-        bg = pygame.Surface((surf.get_width() + 60, surf.get_height() + 30), pygame.SRCALPHA)
-        pygame.draw.rect(bg, (0, 0, 0, alpha), (0, 0, bg.get_width(), bg.get_height()), border_radius=12)
-        ekran.blit(bg, (GENISLIK // 2 - bg.get_width() // 2, 100))
-        
-        surf.set_alpha(alpha)
-        ekran.blit(surf, (GENISLIK // 2 - surf.get_width() // 2, 115))
+        for idx, key in enumerate(silah_keys):
+            if key not in SILAHLAR:
+                continue
+            v = SILAHLAR[key]
+            col = idx % cols
+            row = idx // cols
+            kx = sx + col * (kw + gap)
+            ky = sy + row * (kh + gap)
 
+            # Firsat kontrolu
+            firsat = key in self.firsat_silahlar
+            sahip = key in oyuncu.envanter
+            hover = pygame.Rect(kx, ky, kw, kh).collidepoint(fare)
+
+            # Kart arkaplan
+            if sahip:
+                bg = (30, 50, 35)
+            elif firsat:
+                bg = (50, 40, 20)
+            else:
+                bg = (25, 28, 35)
+
+            border = YESIL if sahip else (SARI if firsat else ((100,100,140) if hover else (45,48,58)))
+
+            pygame.draw.rect(ekran, bg, (kx, ky, kw, kh), border_radius=10)
+            pygame.draw.rect(ekran, border, (kx, ky, kw, kh), 2 if not hover else 3, border_radius=10)
+
+            # Renk noktasi
+            pygame.draw.circle(ekran, v["renk"], (kx + 18, ky + 20), 8)
+
+            # Isim
+            it = self.font_kart.render(v["isim"][:18], True, BEYAZ)
+            ekran.blit(it, (kx + 34, ky + 10))
+
+            # Hasar bilgi
+            ht = self.font_kucuk.render(f"DMG:{v['hasar']}  SPD:{v['ates_hizi']}", True, (160,160,160))
+            ekran.blit(ht, (kx + 10, ky + 38))
+
+            # Fiyat veya sahip
+            if sahip:
+                st = self.font_kucuk.render("[SAHIPSIN]", True, CAMGOBEGI)
+                ekran.blit(st, (kx + 10, ky + kh - 24))
+            else:
+                fiyat = v["fiyat"]
+                if firsat:
+                    fiyat = int(fiyat * self.firsat_carpani)
+                    ft = self.font_kucuk.render(f"FIRSAT: {fiyat}$", True, SARI)
+                else:
+                    ft = self.font_kucuk.render(f"{fiyat}$", True, ALTIN)
+                ekran.blit(ft, (kx + 10, ky + kh - 24))
+
+            # Firsat etiketi
+            if firsat and not sahip:
+                pygame.draw.rect(ekran, (200,160,0), (kx+kw-50, ky+2, 48, 16), border_radius=4)
+                tt = self.font_kucuk.render("-40%", True, SIYAH)
+                ekran.blit(tt, (kx+kw-46, ky+3))
+
+    def _ciz_alt_panel(self, ekran, oyuncu, puan_sis):
+        alt_y = YUKSEKLIK - 70
+        pygame.draw.rect(ekran, (18, 22, 30), (0, alt_y, GENISLIK, 70))
+        pygame.draw.line(ekran, (50, 55, 65), (0, alt_y), (GENISLIK, alt_y), 2)
+
+        # Yukseltmeler — tiklanabilir kartlar
+        bx = 15
+        fare = pygame.mouse.get_pos()
+        for key, veri in YUKSELTMELER.items():
+            seviye = oyuncu.yukseltmeler.get(key, 0)
+            maks = veri["max_seviye"]
+            fiyat = veri["fiyat"] * (seviye + 1)
+            
+            # Kart arkaplan (tiklanabilir alani goster)
+            kart_rect = pygame.Rect(bx, alt_y + 4, 115, 60)
+            hover = kart_rect.collidepoint(fare)
+            bg = (35, 40, 50) if hover else (22, 26, 34)
+            border = CAMGOBEGI if seviye < maks else (50, 50, 50)
+            pygame.draw.rect(ekran, bg, kart_rect, border_radius=6)
+            pygame.draw.rect(ekran, border, kart_rect, 1, border_radius=6)
+            
+            renk = CAMGOBEGI if seviye < maks else (80,80,80)
+            txt = f"{veri['isim']} Lv{seviye}/{maks}"
+            t = self.font_kucuk.render(txt, True, renk)
+            ekran.blit(t, (bx + 4, alt_y + 10))
+            ft = self.font_kucuk.render(f"{fiyat}$", True, ALTIN if seviye < maks else (80,80,80))
+            ekran.blit(ft, (bx + 4, alt_y + 28))
+            bx += 120
+
+        # Görev 25 — Shop: dürbün kartları çiz
+        from ayarlar import DURBUNLER
+        bx_d = 15 + len(YUKSELTMELER) * 120
+        for d_key, d_veri in DURBUNLER.items():
+            sahip = d_key in oyuncu.durbunler
+            aktif = oyuncu.aktif_durbun == d_key
+            renk = YESIL if aktif else (CAMGOBEGI if sahip else (160, 160, 160))
+            kart = pygame.Rect(bx_d, alt_y + 4, 100, 60)
+            pygame.draw.rect(ekran, (22, 26, 34), kart, border_radius=6)
+            pygame.draw.rect(ekran, renk, kart, 1, border_radius=6)
+            t = self.font_kucuk.render(d_veri["isim"], True, renk)
+            ekran.blit(t, (bx_d + 4, alt_y + 10))
+            ft = self.font_kucuk.render(f"{d_veri['fiyat']}$" if not sahip else "[AKTİF]" if aktif else "[SAHIP]", True, ALTIN)
+            ekran.blit(ft, (bx_d + 4, alt_y + 30))
+            bx_d += 105
+
+    def _ciz_devam_butonu(self, ekran):
+        bw, bh = 260, 44
+        bx = GENISLIK // 2 - bw // 2
+        by = YUKSEKLIK - 118
+        fare = pygame.mouse.get_pos()
+        hover = pygame.Rect(bx, by, bw, bh).collidepoint(fare)
+        bg = (40, 180, 60) if hover else (30, 120, 40)
+        pygame.draw.rect(ekran, bg, (bx, by, bw, bh), border_radius=12)
+        pygame.draw.rect(ekran, (80, 220, 100), (bx, by, bw, bh), 2, border_radius=12)
+        t = self.font_buton.render(">> SONRAKI DALGA >>", True, BEYAZ)
+        ekran.blit(t, (bx + bw//2 - t.get_width()//2, by + 8))
+
+    # ── TIK ISLE ─────────────────────────────────────────────
     def tik_isle(self, event, oyuncu, puan_sis):
         if event.type == pygame.MOUSEWHEEL:
-            # Sadece aşağı/yukarı kaydırma
-            self.hedef_kaydirma_y += event.y * 60
-            if self.hedef_kaydirma_y > 0: self.hedef_kaydirma_y = 0
-            # Alt sınır: (Silah sayısı / 4) * 200 + offset
-            min_y = -((len(SILAH_SIRASI) // 4) * 200) + YUKSEKLIK - 300
-            if self.hedef_kaydirma_y < min_y: self.hedef_kaydirma_y = min_y
+            self.hedef_scroll = max(0, self.hedef_scroll - event.y * 40)
             return None
 
-        if event.type != pygame.MOUSEBUTTONDOWN or event.button != 1: return None
-        fare_x, fare_y_real = pygame.mouse.get_pos()
-        fare_y = fare_y_real - self.kaydirma_y
+        if event.type != pygame.MOUSEBUTTONDOWN or event.button != 1:
+            return None
 
-        if pygame.Rect(GENISLIK // 2 - 200, YUKSEKLIK - 110, 400, 70).collidepoint(fare_x, fare_y_real):
+        fx, fy = event.pos
+
+        # Devam butonu
+        bw, bh = 260, 44
+        bx = GENISLIK // 2 - bw // 2
+        by = YUKSEKLIK - 118
+        if pygame.Rect(bx, by, bw, bh).collidepoint(fx, fy):
             return "devam"
 
-        bx, by, kart_gen, kart_yuk, bosluk = 80, 180, 200, 180, 20
-        for i, key in enumerate(SILAH_SIRASI):
-            if key == "tabanca": continue
-            idx = i - 1
-            kx, ky = bx + (idx % 4) * (kart_gen + bosluk), by + (idx // 4) * (kart_yuk + bosluk)
-            if pygame.Rect(kx, ky, kart_gen, kart_yuk).collidepoint(fare_x, fare_y):
-                if key in oyuncu.envanter:
-                    self._mesaj_goster("Zaten sahipsin! (Mermiler Doldu)")
-                elif puan_sis.harca(SILAHLAR[key]["fiyat"]):
-                    oyuncu.silah_al(key)
-                    self._mesaj_goster(f"✓ {SILAHLAR[key]['isim']} alındı!")
-                else:
-                    self._mesaj_goster("❌ Yeterli kredi yok!")
+        # Kategori sekmeleri
+        kbx, kby = 5, 70
+        kbw, kbh = 165, 32
+        for i in range(len(KATEGORILER)):
+            r = pygame.Rect(kbx, kby + i * (kbh + 4), kbw, kbh)
+            if r.collidepoint(fx, fy):
+                self.aktif_kategori = i
+                self.hedef_scroll = 0
+                self.scroll_y = 0
+                return None
 
-        bx, by, kart_gen, kart_yuk, bosluk = GENISLIK - 600, 180, 260, 110, 15
-        for i, key in enumerate(YUKSELTMELER.keys()):
-            kx, ky = bx + (i % 2) * (kart_gen + bosluk), by + (i // 2) * (kart_yuk + bosluk)
-            if pygame.Rect(kx, ky, kart_gen, kart_yuk).collidepoint(fare_x, fare_y):
-                veri = YUKSELTMELER[key]
-                if oyuncu.yukseltmeler.get(key, 0) >= veri["max_seviye"]:
-                    self._mesaj_goster("Maksimum seviyeye ulaşıldı!")
-                elif puan_sis.harca(veri["fiyat"]):
-                    oyuncu.yukseltmeler[key] = oyuncu.yukseltmeler.get(key, 0) + 1
-                    if key == "can":
-                        oyuncu.max_can += 40
-                        oyuncu.can = min(oyuncu.can + 40, oyuncu.max_can)
-                    elif key == "kalkan":
-                        oyuncu.max_kalkan += 40
-                        oyuncu.kalkan = min(oyuncu.kalkan + 40, oyuncu.max_kalkan)
-                    elif key == "stamina":
-                        oyuncu.max_stamina += 30
-                        oyuncu.stamina = min(oyuncu.stamina + 30, oyuncu.max_stamina)
-                    self._mesaj_goster(f"✓ {veri['isim']} Sev.{oyuncu.yukseltmeler[key]} oldu!")
-                else:
-                    self._mesaj_goster("❌ Yeterli kredi yok!")
+        # Silah kartlari
+        clip = pygame.Rect(180, 65, GENISLIK - 195, YUKSEKLIK - 140)
+        if clip.collidepoint(fx, fy):
+            _, silah_keys = KATEGORILER[self.aktif_kategori]
+            kw, kh, gap = 200, 110, 12
+            cols = max(1, (clip.width - gap) // (kw + gap))
+            sx = clip.x + gap
+            sy = clip.y + gap - int(self.scroll_y)
 
-        # Dürbün Tıklama Kontrolü
-        bx, by, kart_gen, kart_yuk, bosluk = GENISLIK - 600, 740, 260, 80, 15
-        for i, key in enumerate(DURBUNLER.keys()):
-            kx, ky = bx + (i % 2) * (kart_gen + bosluk), by + (i // 2) * (kart_yuk + bosluk)
-            if pygame.Rect(kx, ky, kart_gen, kart_yuk).collidepoint(fare_x, fare_y):
-                veri = DURBUNLER[key]
-                if key in oyuncu.durbunler:
-                    oyuncu.aktif_durbun = key
-                    self._mesaj_goster(f"✓ {veri['isim']} takıldı!")
-                elif puan_sis.harca(veri["fiyat"]):
-                    oyuncu.durbunler.append(key)
-                    oyuncu.aktif_durbun = key
-                    self._mesaj_goster(f"✓ {veri['isim']} satın alındı ve takıldı!")
-                else:
-                    self._mesaj_goster("❌ Yeterli kredi yok!")
+            for idx, key in enumerate(silah_keys):
+                if key not in SILAHLAR:
+                    continue
+                col = idx % cols
+                row = idx // cols
+                kx = sx + col * (kw + gap)
+                ky = sy + row * (kh + gap)
+                if pygame.Rect(kx, ky, kw, kh).collidepoint(fx, fy):
+                    self._satin_al(key, oyuncu, puan_sis)
+                    return None
+
+        # Yukseltme tiklama
+        alt_y = YUKSEKLIK - 70
+        if fy >= alt_y:
+            bx = 15
+            for key, veri in YUKSELTMELER.items():
+                r = pygame.Rect(bx, alt_y, 115, 50)
+                if r.collidepoint(fx, fy):
+                    self._yukseltme_al(key, oyuncu, puan_sis)
+                    return None
+                bx += 120
+            
+            # Dürbün satın alma
+            from ayarlar import DURBUNLER
+            bx2 = 15 + len(YUKSELTMELER) * 120
+            for d_key, d_veri in DURBUNLER.items():
+                r = pygame.Rect(bx2, alt_y, 100, 50)
+                if r.collidepoint(fx, fy):
+                    self._durbun_al(d_key, oyuncu, puan_sis)
+                    return None
+                bx2 += 105
+
         return None
 
-    def _mesaj_goster(self, metin):
-        self.mesaj = metin
-        self.mesaj_sayac = 2.0
+    def _satin_al(self, key, oyuncu, puan_sis):
+        if key in oyuncu.envanter:
+            self._mesaj("Zaten sahipsin!")
+            ses_sis.oynat("ui_click")
+            return
+        v = SILAHLAR[key]
+        fiyat = v["fiyat"]
+        if key in self.firsat_silahlar:
+            fiyat = int(fiyat * self.firsat_carpani)
+        if puan_sis.harca(fiyat):
+            oyuncu.silah_al(key)
+            ses_sis.oynat("ui_satin_al")
+            self._mesaj(f"{v['isim']} alindi!")
+        else:
+            ses_sis.oynat("ui_click")
+            self._mesaj(f"Yeterli para yok! ({fiyat}$ gerekli)")
+
+    def _yukseltme_al(self, key, oyuncu, puan_sis):
+        veri = YUKSELTMELER[key]
+        seviye = oyuncu.yukseltmeler.get(key, 0)
+        if seviye >= veri["max_seviye"]:
+            ses_sis.oynat("ui_click")
+            self._mesaj("Maks seviye!")
+            return
+        fiyat = veri["fiyat"] * (seviye + 1)
+        if puan_sis.harca(fiyat):
+            oyuncu.yukseltmeler[key] = seviye + 1
+            ses_sis.oynat("ui_satin_al")
+            self._mesaj(f"{veri['isim']} Lv{seviye+1}!")
+        else:
+            ses_sis.oynat("ui_click")
+            self._mesaj(f"Yeterli para yok! ({fiyat}$ gerekli)")
+
+    def _durbun_al(self, key, oyuncu, puan_sis):
+        from ayarlar import DURBUNLER
+        if key in oyuncu.durbunler:
+            oyuncu.aktif_durbun = key
+            ses_sis.oynat("ui_click")
+            self._mesaj(f"{DURBUNLER[key]['isim']} takıldı!")
+            return
+        veri = DURBUNLER[key]
+        if puan_sis.harca(veri["fiyat"]):
+            oyuncu.durbunler.append(key)
+            oyuncu.aktif_durbun = key
+            ses_sis.oynat("ui_satin_al")
+            self._mesaj(f"{veri['isim']} takıldı!")
+        else:
+            ses_sis.oynat("ui_click")
+            self._mesaj(f"Yeterli para yok! ({veri['fiyat']}$ gerekli)")

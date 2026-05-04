@@ -37,11 +37,23 @@ class Drop(pygame.sprite.Sprite):
             img.blit(t, (cx - t.get_width() // 2, cy - t.get_height() // 2))
         return img
 
-    def update(self, dt):
+    def update(self, dt, manyetik=False, oyuncu_x=0, oyuncu_y=0):
         self.omur -= dt
         self.titreme += dt * 4
         # Hafif yukarı-aşağı salınım
         offset_y = int(math.sin(self.titreme) * 3)
+        
+        # PERK: Manyetik cekim — drop oyuncuya dogru hareket eder
+        if manyetik:
+            manyetik_mesafe = 200
+            dx = oyuncu_x - self.x
+            dy = oyuncu_y - self.y
+            dist = math.hypot(dx, dy)
+            if 0 < dist < manyetik_mesafe:
+                cekim_hizi = 250 * (1 - dist / manyetik_mesafe)
+                self.x += (dx / dist) * cekim_hizi * dt
+                self.y += (dy / dist) * cekim_hizi * dt
+        
         self.rect.center = (int(self.x), int(self.y) + offset_y)
         if self.omur <= 0:
             self.kill()

@@ -1,0 +1,29 @@
+# Çıktı ve derleme klasörleri
+build/
+dist/
+*.egg-info/
+*.spec
+
+# Python önbellek dosyaları
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Ortam değişkenleri ve sanal ortamlar
+.venv/
+venv/
+env/
+.env
+
+# İşletim sistemi kalıntıları
+.DS_Store
+Thumbs.db
+
+# IDE dosyaları
+.vscode/
+.idea/
+
+# Oyunla ilgili loglar ve geçici veriler (isteğe bağlı)
+*.log
+kayitlar/*.json
+!kayitlar/highscore.json

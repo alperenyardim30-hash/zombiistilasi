@@ -80,10 +80,15 @@ class PuanSistemi:
         try:
             with open(KAYIT_DOSYASI, "r", encoding="utf-8") as f:
                 return json.load(f).get("skorlar", [])
-        except (FileNotFoundError, json.JSONDecodeError):
+        except Exception:
             return []
 
     def _kaydet(self):
-        os.makedirs(os.path.dirname(KAYIT_DOSYASI), exist_ok=True)
-        with open(KAYIT_DOSYASI, "w", encoding="utf-8") as f:
-            json.dump({"skorlar": self.yuksek_skorlar}, f, indent=2)
+        try:
+            os.makedirs(os.path.dirname(KAYIT_DOSYASI), exist_ok=True)
+            tmp = KAYIT_DOSYASI + ".tmp"
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump({"skorlar": self.yuksek_skorlar}, f, indent=2)
+            os.replace(tmp, KAYIT_DOSYASI)  # Atomik — asıl dosya asla yarım kalmaz
+        except Exception as e:
+            print(f"Skor kaydedilemedi: {e}")

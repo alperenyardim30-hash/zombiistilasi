@@ -5,6 +5,8 @@ import pygame
 import math
 import random
 
+_parcacik_cache = {}
+
 
 class Parcacik:
     """Kan/ateş parçacığı."""
@@ -31,10 +33,14 @@ class Parcacik:
         return self.omur > 0
 
     def ciz(self, ekran):
-        alpha = int(255 * (self.omur / self.max_omur))
-        surf = pygame.Surface((self.r * 2, self.r * 2), pygame.SRCALPHA)
-        pygame.draw.circle(surf, (*self.renk, alpha), (self.r, self.r), self.r)
-        ekran.blit(surf, (int(self.x) - self.r, int(self.y) - self.r))
+        alpha = max(0, min(255, int(255 * (self.omur / self.max_omur))))
+        alpha = (alpha // 10) * 10
+        key = (self.r, self.renk, alpha)
+        if key not in _parcacik_cache:
+            surf = pygame.Surface((self.r * 2, self.r * 2), pygame.SRCALPHA)
+            pygame.draw.circle(surf, (*self.renk, alpha), (self.r, self.r), self.r)
+            _parcacik_cache[key] = surf
+        ekran.blit(_parcacik_cache[key], (int(self.x) - self.r, int(self.y) - self.r))
 
 
 class HarasarSayisi:
@@ -57,14 +63,34 @@ class HarasarSayisi:
 
     def ciz(self, ekran, font_kucuk, font_orta):
         alpha = int(255 * (self.omur / self.max_omur))
+        # Görev 12 — Hasar sayıları büyüklük farkı
+        try:
+            deger = float(self.metin)
+            if deger > 200:
+                self.buyuk = True
+            if deger > 500:
+                # Kırmızı-Sarı gradient yerine şimdilik renk değiştir
+                self.renk = (255, random.randint(100, 200), 0)
+        except ValueError:
+            pass
+            
         font = font_orta if self.buyuk else font_kucuk
         surf = font.render(self.metin, True, self.renk)
         surf.set_alpha(alpha)
         ekran.blit(surf, (int(self.x) - surf.get_width() // 2, int(self.y)))
 
 
-def kan_parcaciklari(x, y, n=12, renk=(180, 20, 20)):
+def kan_parcaciklari(x, y, n=12, renk=(180, 20, 20), tip="normal"):
     """Zombi öldüğünde kan parçacıkları üretir."""
+    if tip == "parca":
+        parcalar = []
+        for _ in range(n):
+            hiz = random.uniform(60, 180)
+            aci = random.uniform(0, 360)
+            p = Parcacik(x, y, renk, hiz=hiz, omur=random.uniform(0.4, 0.9))
+            p.r = random.randint(3, 7)
+            parcalar.append(p)
+        return parcalar
     return [Parcacik(x, y, renk, hiz=130, omur=random.uniform(0.4, 0.8)) for _ in range(n)]
 
 
@@ -93,7 +119,7 @@ class BasarimBildirimi:
         surf.fill((30, 20, 50, alpha))
         ekran.blit(surf, (bx, by))
         pygame.draw.rect(ekran, (255, 200, 0), (bx, by, bw, bh), 2, border_radius=8)
-        t1 = font_m.render(f"🏆 {self.isim}", True, (255, 200, 0))
+        t1 = font_m.render(f"[!] {self.isim}", True, (255, 200, 0))
         t2 = font_k.render(self.aciklama, True, (200, 200, 200))
         t1.set_alpha(alpha)
         t2.set_alpha(alpha)
