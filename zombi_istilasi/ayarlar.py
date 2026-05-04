@@ -1,19 +1,18 @@
 # ============================================================
 #  ayarlar.py — 60 Silah (Elementler) & Devasa Güncelleme
 # ============================================================
-import ctypes
 import os
+import pygame
 
 
 def _ekran_boyutu_al():
     """
-    Mümkünse sistemin gerçek ekran çözünürlüğünü alır.
-    Windows dışı ortamlarda güvenli varsayılan değere düşer.
+    Sistemin gerçek ekran çözünürlüğünü pygame ile alır.
     """
     try:
-        user32 = ctypes.windll.user32
-        user32.SetProcessDPIAware()
-        return user32.GetSystemMetrics(0), user32.GetSystemMetrics(1)
+        pygame.display.init()
+        info = pygame.display.Info()
+        return info.current_w, info.current_h
     except Exception:
         return 1920, 1080
 
@@ -44,7 +43,6 @@ ZOMBI_YESIL= (90, 160, 70)
 
 # Zorluk — NOT: Bu global artik dogrudan yazilmamali.
 # DalgaSistemi instance uzerinden yonetilecek.
-ZORLUK_CARPANI = 1.0
 
 # Zombi Element Zafiyetleri (carpan >= 1.5 = ZAYIF NOKTA, <= 0.5 = DIRENCLI)
 ZAFIYET_TABLOSU = {

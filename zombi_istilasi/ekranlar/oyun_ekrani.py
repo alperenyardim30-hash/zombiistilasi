@@ -1,24 +1,24 @@
 # ============================================================
-#  ekranlar/oyun_ekrani.py — Nişangah Konisi (Aim Cone) ve Devasa Grafikler
+#  ekranlar/oyun_ekrani.py
 # ============================================================
 import pygame
 import math
 import random
 from ayarlar import (
-    GENISLIK, YUKSEKLIK, ARKAPLAN, BEYAZ, SIYAH, KIRMIZI, YESIL, SARI, ALTIN, 
-    SILAHLAR, SILAH_SIRASI, ZIRH_MAVI, CAMGOBEGI, PEMBE, MOR, TURUNCU
+    GENISLIK, YUKSEKLIK, BEYAZ, SIYAH, KIRMIZI, YESIL, SARI, ALTIN,
+    SILAHLAR, SILAH_SIRASI, ZIRH_MAVI, MOR, ZAFIYET_TABLOSU,
 )
-from varliklar.oyuncu  import Oyuncu
-from varliklar.zombi   import Zombi
-from varliklar.drop    import Drop
-from varliklar.patlama import Patlama
+from varliklar.oyuncu   import Oyuncu
+from varliklar.patlama  import Patlama
 from varliklar.parcacik import kan_parcaciklari, HarasarSayisi, BasarimBildirimi
-from varliklar.isik import AnlikIsin
-from sistemler.dalga_sistemi import DalgaSistemi
-from sistemler.puan_sistemi  import PuanSistemi
-from sistemler.perk_sistemi  import PerkSistemi
-from sistemler.gorev_sistemi import GorevSistemi
-from sistemler.ses_sistemi   import ses_sis
+from varliklar.isik     import AnlikIsin
+from sistemler.dalga_sistemi   import DalgaSistemi
+from sistemler.puan_sistemi    import PuanSistemi
+from sistemler.perk_sistemi    import PerkSistemi, PERKLER
+from sistemler.gorev_sistemi   import GorevSistemi
+from sistemler.basarim_sistemi import BasarimSistemi
+from sistemler.ses_sistemi     import ses_sis
+from ekranlar.hud              import HudYoneticisi
 
 class OyunEkrani:
     def __init__(self):
@@ -33,7 +33,15 @@ class OyunEkrani:
             i: pygame.font.SysFont("Impact", i, bold=True)
             for i in range(46, 90, 4)
         }
-        
+
+        self.hud = HudYoneticisi({
+            "hud":   self.font_hud,
+            "buyuk": self.font_buyuk,
+            "kucuk": self.font_kucuk,
+            "mermi": self.font_mermi,
+            "combo": self._combo_fontlar,
+        })
+
         # Grafik iyileştirme: Zemin Detayları — PRE-RENDER edilmiş Surface
         self._zemin_verileri = []
         for _ in range(300):
@@ -81,7 +89,6 @@ class OyunEkrani:
         self.puan_sis    = PuanSistemi()
         self.perk_sis    = PerkSistemi()
         self.gorev_sis   = GorevSistemi()
-        from sistemler.basarim_sistemi import BasarimSistemi
         self.basarim_sis = BasarimSistemi()
         
         self.istatistikler = {
@@ -436,8 +443,6 @@ class OyunEkrani:
         bx = x + math.cos(aci_rad) * uzunluk
         by = y + math.sin(aci_rad) * uzunluk
 
-        # Tum zombileri kontrol et — isabededenler hasar alir
-        from ayarlar import ZAFIYET_TABLOSU
         for z in list(self.zombiler):
             if not z.alive():
                 continue
@@ -558,212 +563,13 @@ class OyunEkrani:
             flash.fill((255, 220, 0, alpha))
             ekran.blit(flash, (0, 0))
 
-        # 2D/3D ve Harita ipucu metni
-        ipucu = self.font_kucuk.render(
-            f"3: 2D/3D  |  M: Harita ({aktif_harita['isim']})",
-            True,
-            (200, 200, 200),
-        )
-        ekran.blit(ipucu, (GENISLIK - ipucu.get_width() - 20, YUKSEKLIK - ipucu.get_height() - 20))
-
-        self._ciz_hud(ekran)
-        self._ciz_boss_bar(ekran)
-        self._ciz_bildirim(ekran)
-        self._ciz_silah_bar(ekran)
+        self.hud.ciz(ekran, self.oyuncu, self.puan_sis, self.dalga_sis, self.perk_sis, self.zombiler)
         self.oyuncu.flash_ciz(ekran)
-        
-        for b in self.basarimlar: b.ciz(ekran, self.font_kucuk, self.font_hud, GENISLIK, YUKSEKLIK)
-        
-        # Görev HUD (sağ üst)
+        for b in self.basarimlar:
+            b.ciz(ekran, self.font_kucuk, self.font_hud, GENISLIK, YUKSEKLIK)
         self.gorev_sis.ciz_hud(ekran, self.font_hud, self.font_kucuk, GENISLIK, YUKSEKLIK)
-        
-        # Perk seçim ekranı (varsa üstte çiz)
         if self.perk_sis.secim_bekliyor:
             self.perk_sis.ciz_secim_ekrani(ekran, self.font_buyuk, self.font_hud, self.font_kucuk, GENISLIK, YUKSEKLIK)
-
-    def _ciz_hud(self, ekran):
-        pygame.draw.rect(ekran, (10, 10, 15, 200), (20, 20, 300, 140), border_radius=12)
-        pygame.draw.rect(ekran, (50, 50, 60), (20, 20, 300, 140), 2, border_radius=12)
-        
-        bx, by, bg, byk = 30, 30, 280, 16
-        
-        # 1. Can
-        c_oran = self.oyuncu.can / self.oyuncu.max_can_degeri
-        pygame.draw.rect(ekran, (60, 0, 0), (bx, by, bg, byk), border_radius=6)
-        if c_oran > 0: pygame.draw.rect(ekran, (220, 50, 50), (bx, by, int(bg * c_oran), byk), border_radius=6)
-        ekran.blit(self.font_kucuk.render(f"HP: {int(self.oyuncu.can)}", True, BEYAZ), (bx + 8, by))
-        
-        # 2. Kalkan
-        by += 22
-        k_oran = self.oyuncu.kalkan / self.oyuncu.max_kalkan_degeri
-        pygame.draw.rect(ekran, (0, 30, 80), (bx, by, bg, byk), border_radius=6)
-        if k_oran > 0: pygame.draw.rect(ekran, ZIRH_MAVI, (bx, by, int(bg * k_oran), byk), border_radius=6)
-        ekran.blit(self.font_kucuk.render(f"SH: {int(self.oyuncu.kalkan)}", True, BEYAZ), (bx + 8, by))
-        
-        # Görev 14 — Kalkan yenilenme bekleme göstergesi
-        if self.oyuncu.kalkan_yenilenme_sayaci > 0:
-            bekleme_t = self.font_kucuk.render(
-                f"SH: {self.oyuncu.kalkan_yenilenme_sayaci:.1f}s", True, (100, 100, 200)
-            )
-            ekran.blit(bekleme_t, (bx + bg + 8, by - 22))
-
-        # 3. Stamina
-        by += 22
-        s_oran = self.oyuncu.stamina / self.oyuncu.max_stamina_degeri
-        pygame.draw.rect(ekran, (60, 60, 60), (bx, by, bg, byk), border_radius=6)
-        if s_oran > 0: pygame.draw.rect(ekran, (255, 255, 100), (bx, by, int(bg * s_oran), byk), border_radius=6)
-        ekran.blit(self.font_kucuk.render(f"STM: {int(self.oyuncu.stamina)}", True, SIYAH if s_oran > 0.5 else BEYAZ), (bx + 8, by))
-
-        # 4. XP
-        by += 22
-        xp_oran = self.puan_sis.xp / self.puan_sis.xp_hedef
-        pygame.draw.rect(ekran, (40, 40, 40), (bx, by, bg, byk), border_radius=6)
-        if xp_oran > 0: pygame.draw.rect(ekran, MOR, (bx, by, int(bg * xp_oran), byk), border_radius=6)
-        ekran.blit(self.font_kucuk.render(f"SV: {self.puan_sis.seviye}", True, BEYAZ), (bx + 8, by))
-        
-        # 5. Ultimate
-        by += 22
-        u_oran = 1.0 - (self.oyuncu.ult_bekleme / self.oyuncu.ult_max_cd)
-        pygame.draw.rect(ekran, (40, 40, 0), (bx, by, bg, byk), border_radius=6)
-        if u_oran > 0: pygame.draw.rect(ekran, SARI, (bx, by, int(bg * u_oran), byk), border_radius=6)
-        ekran.blit(self.font_kucuk.render("ULT [BOŞLUK]" if u_oran >= 1.0 else f"ULT: {self.oyuncu.ult_bekleme:.1f}s", True, SIYAH if u_oran >= 1.0 else BEYAZ), (bx + bg//2 - 45, by))
-        
-        # Görev 16 — Aktif Perk İkonları
-        if self.perk_sis.aktif_perkler:
-            py_ikon = 175
-            for p_key in self.perk_sis.aktif_perkler[:6]:  # max 6 göster
-                from sistemler.perk_sistemi import PERKLER
-                p = PERKLER.get(p_key, {})
-                isim = p.get("isim", p_key)[:12]
-                pt = self.font_kucuk.render(isim, True, (180, 255, 180))
-                ekran.blit(pt, (25, py_ikon))
-                py_ikon += 18
-
-        # Sağ üst panel
-        pygame.draw.rect(ekran, (10, 10, 15, 200), (GENISLIK - 240, 20, 220, 110), border_radius=12)
-        pygame.draw.rect(ekran, (50, 50, 60), (GENISLIK - 240, 20, 220, 110), 2, border_radius=12)
-        
-        st = self.font_hud.render(f"PUAN: {self.puan_sis.puan}", True, BEYAZ)
-        ekran.blit(st, (GENISLIK - st.get_width() - 35, 30))
-        pt = self.font_hud.render(f"PARA: {self.puan_sis.para}$", True, ALTIN)
-        ekran.blit(pt, (GENISLIK - pt.get_width() - 35, 60))
-        dt2 = self.font_hud.render(f"DALGA: {self.dalga_sis.dalga_no}", True, (180, 255, 180))
-        ekran.blit(dt2, (GENISLIK - dt2.get_width() - 35, 90))
-        
-        # Görev 33 — Zombi Sayısı Göstergesi
-        spawn_kalan = len(self.dalga_sis.spawn_listesi)
-        zombi_kalan = len(self.zombiler) + spawn_kalan
-        zt = self.font_hud.render(f"ZOMBİ: {zombi_kalan}", True, (220, 80, 80))
-        ekran.blit(zt, (GENISLIK - zt.get_width() - 35, 120))
-        
-        # Görev 28 — Dalga Modu Para Çarpanı Göstergesi
-        mod = getattr(self.dalga_sis, 'aktif_mod', None)
-        if mod and mod.get("efekt") == "para":
-            pt2 = self.font_hud.render("💰 2x PARA", True, ALTIN)
-            ekran.blit(pt2, (GENISLIK - pt2.get_width() - 35, 150))
-
-        # Sağ alt panel - MERMİ GÖSTERGESİ (Büyütüldü)
-        ak = self.oyuncu.aktif_silah
-        mermi = self.oyuncu.mermiler.get(ak, -1)
-        kapasite = self.oyuncu._silah_max_mermi(ak)
-        
-        m_metin = "∞" if kapasite == -1 else f"{mermi}/{kapasite}"
-        renk = KIRMIZI if mermi == 0 else (SARI if mermi < kapasite * 0.3 else BEYAZ)
-        
-        pygame.draw.rect(ekran, (10, 10, 15, 200), (GENISLIK - 260, YUKSEKLIK - 120, 240, 100), border_radius=15)
-        pygame.draw.rect(ekran, (50, 50, 60), (GENISLIK - 260, YUKSEKLIK - 120, 240, 100), 2, border_radius=15)
-        
-        t = self.font_mermi.render(m_metin, True, renk)
-        ekran.blit(t, (GENISLIK - 140 - t.get_width()//2, YUKSEKLIK - 105))
-        
-        silah_isim = SILAHLAR[ak]["isim"]
-        sit = self.font_kucuk.render(silah_isim, True, SILAHLAR[ak]["renk"])
-        ekran.blit(sit, (GENISLIK - 140 - sit.get_width()//2, YUKSEKLIK - 45))
-
-        # Combo
-        if self.puan_sis.combo > 1:
-            cx = GENISLIK // 2
-            cy = 80
-            boyut = 46 + min(20, self.puan_sis.combo * 2)
-            boyut = (boyut // 4) * 4  # Görev 29 Font cache
-            font_combo = self._combo_fontlar.get(boyut, self.font_buyuk)
-            titreme = random.randint(-2, 2) if self.puan_sis.combo >= 5 else 0
-            renk = (255, 100, 0) if self.puan_sis.combo < 10 else (255, 50, 50)
-            ct = font_combo.render(f"{self.puan_sis.combo}x COMBO!", True, renk)
-            ekran.blit(ct, (cx - ct.get_width() // 2 + titreme, cy + titreme))
-
-    def _ciz_silah_bar(self, ekran):
-        bar_yuk = 80
-        bar_y = YUKSEKLIK - bar_yuk - 20
-        
-        kart_gen, bosluk = 80, 10
-        # Görev 30 — Silah Bar Pencere Scroll
-        sahip = [k for k in SILAH_SIRASI if k in self.oyuncu.envanter]
-        aktif_idx = sahip.index(self.oyuncu.aktif_silah) if self.oyuncu.aktif_silah in sahip else 0
-        pencere_boyutu = 9
-        baslangic = max(0, min(len(sahip) - pencere_boyutu, aktif_idx - pencere_boyutu // 2))
-        baslangic = max(0, baslangic)
-        gosterilecek = sahip[baslangic:baslangic + pencere_boyutu]
-        
-        toplam_gen = len(gosterilecek) * (kart_gen + bosluk) - bosluk
-        start_x = GENISLIK // 2 - toplam_gen // 2
-        
-        # Arkaplan
-        pygame.draw.rect(ekran, (10, 10, 15, 200), (start_x - 10, bar_y - 10, toplam_gen + 20, bar_yuk + 20), border_radius=15)
-
-        for i, key in enumerate(gosterilecek):
-            veri = SILAHLAR[key]
-            aktif = self.oyuncu.aktif_silah == key
-            kx, ky, kh = start_x + i * (kart_gen + bosluk), bar_y, bar_yuk
-
-            bg = (50, 80, 50) if aktif else (30, 30, 40)
-            border = veri["renk"] if aktif else (80, 80, 80)
-            
-            if aktif:
-                hale = pygame.Surface((kart_gen+10, kh+10), pygame.SRCALPHA)
-                pygame.draw.rect(hale, (*veri["renk"], 80), (0, 0, kart_gen+10, kh+10), border_radius=12)
-                ekran.blit(hale, (kx-5, ky-5))
-
-            pygame.draw.rect(ekran, bg, (kx, ky, kart_gen, kh), border_radius=10)
-            pygame.draw.rect(ekran, border, (kx, ky, kart_gen, kh), 2, border_radius=10)
-
-            pygame.draw.circle(ekran, veri["renk"], (kx + kart_gen//2, ky + 25), 12)
-            isim_t = self.font_kucuk.render(veri["isim"][:9], True, BEYAZ if aktif else (160, 160, 160))
-            ekran.blit(isim_t, (kx + kart_gen//2 - isim_t.get_width()//2, ky + 45))
-
-    def _ciz_bildirim(self, ekran):
-        # Görev 24 — Dalga Modu Ekran Kenarı Rengi
-        mod = getattr(self.dalga_sis, 'aktif_mod', None)
-        if mod and mod.get("efekt") not in (None, "karanlik"):
-            renk = mod.get("renk", (255, 255, 255))
-            alpha = max(0, min(255, 60 + int(30 * math.sin(pygame.time.get_ticks() / 300))))
-            cerceve = pygame.Surface((GENISLIK, YUKSEKLIK), pygame.SRCALPHA)
-            pygame.draw.rect(cerceve, (*renk, alpha), (0, 0, GENISLIK, YUKSEKLIK), 8)
-            ekran.blit(cerceve, (0, 0))
-
-        metin, kalan = self.dalga_sis.bildirim_goster()
-        if not metin: return
-        alpha = min(255, int(255 * (kalan / 2.5)))
-        surf = self.font_buyuk.render(metin, True, (255, 100, 100) if "BOSS" in metin else SARI)
-        surf.set_alpha(alpha)
-        ekran.blit(surf, (GENISLIK // 2 - surf.get_width() // 2, YUKSEKLIK // 2 - 120))
-        
-    def _ciz_boss_bar(self, ekran):
-        # Görev 15 — Boss Can Barı Sabitleme
-        for z in self.zombiler:
-            if z.tip == "boss" and z.alive():
-                bw, bh = 600, 22
-                bx = GENISLIK // 2 - bw // 2
-                by = 15
-                oran = max(0, z.can / z.max_can)
-                pygame.draw.rect(ekran, (60, 0, 0), (bx, by, bw, bh), border_radius=8)
-                if oran > 0:
-                    renk = (220, 30, 30) if oran > 0.3 else (255, 80, 0)
-                    pygame.draw.rect(ekran, renk, (bx, by, int(bw * oran), bh), border_radius=8)
-                pygame.draw.rect(ekran, (180, 0, 0), (bx, by, bw, bh), 2, border_radius=8)
-                bt = self.font_kucuk.render(f"👹 BOSS  {int(z.can)}/{int(z.max_can)}", True, (255, 200, 200))
-                ekran.blit(bt, (GENISLIK // 2 - bt.get_width() // 2, by + 2))
-                break
 
     @property
     def oyuncu_oldu_mu(self): return self.bitti
@@ -777,3 +583,4 @@ class OyunEkrani:
     def dalga_no(self): return self.dalga_sis.dalga_no
     @property
     def yuksek_skorlar(self): return self.puan_sis.yuksek_skorlar
+

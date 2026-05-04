@@ -2293,14 +2293,15 @@ imported by:
   <a target="code" href="///C:/Users/thewo/zombiistilasi/zombi_istilasi/ayarlar.py" type="text/plain"><tt>ayarlar</tt></a>
 <span class="moduletype">SourceModule</span>  <div class="import">
 imports:
-    <a href="#ctypes">ctypes</a>
- &#8226;   <a href="#os">os</a>
+    <a href="#os">os</a>
+ &#8226;   <a href="#pygame">pygame</a>
 
   </div>
   <div class="import">
 imported by:
     <a href="#ekranlar.ana_menu">ekranlar.ana_menu</a>
  &#8226;   <a href="#ekranlar.duraklama">ekranlar.duraklama</a>
+ &#8226;   <a href="#ekranlar.hud">ekranlar.hud</a>
  &#8226;   <a href="#ekranlar.oyun_bitti">ekranlar.oyun_bitti</a>
  &#8226;   <a href="#ekranlar.oyun_ekrani">ekranlar.oyun_ekrani</a>
  &#8226;   <a href="#ekranlar.shop">ekranlar.shop</a>
@@ -2941,8 +2942,7 @@ imports:
   </div>
   <div class="import">
 imported by:
-    <a href="#ayarlar">ayarlar</a>
- &#8226;   <a href="#ctypes._endian">ctypes._endian</a>
+    <a href="#ctypes._endian">ctypes._endian</a>
  &#8226;   <a href="#multiprocessing.sharedctypes">multiprocessing.sharedctypes</a>
 
   </div>
@@ -3060,6 +3060,7 @@ imported by:
 imported by:
     <a href="#ekranlar.ana_menu">ekranlar.ana_menu</a>
  &#8226;   <a href="#ekranlar.duraklama">ekranlar.duraklama</a>
+ &#8226;   <a href="#ekranlar.hud">ekranlar.hud</a>
  &#8226;   <a href="#ekranlar.oyun_bitti">ekranlar.oyun_bitti</a>
  &#8226;   <a href="#ekranlar.oyun_ekrani">ekranlar.oyun_ekrani</a>
  &#8226;   <a href="#ekranlar.shop">ekranlar.shop</a>
@@ -3106,6 +3107,27 @@ imported by:
 </div>
 
 <div class="node">
+  <a name="ekranlar.hud"></a>
+  <a target="code" href="///C:/Users/thewo/zombiistilasi/zombi_istilasi/ekranlar/hud.py" type="text/plain"><tt>ekranlar.hud</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#ayarlar">ayarlar</a>
+ &#8226;   <a href="#ekranlar">ekranlar</a>
+ &#8226;   <a href="#math">math</a>
+ &#8226;   <a href="#pygame">pygame</a>
+ &#8226;   <a href="#random">random</a>
+ &#8226;   <a href="#sistemler.perk_sistemi">sistemler.perk_sistemi</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#ekranlar.oyun_ekrani">ekranlar.oyun_ekrani</a>
+
+  </div>
+
+</div>
+
+<div class="node">
   <a name="ekranlar.oyun_bitti"></a>
   <a target="code" href="///C:/Users/thewo/zombiistilasi/zombi_istilasi/ekranlar/oyun_bitti.py" type="text/plain"><tt>ekranlar.oyun_bitti</tt></a>
 <span class="moduletype">SourceModule</span>  <div class="import">
@@ -3131,6 +3153,7 @@ imported by:
 imports:
     <a href="#ayarlar">ayarlar</a>
  &#8226;   <a href="#ekranlar">ekranlar</a>
+ &#8226;   <a href="#ekranlar.hud">ekranlar.hud</a>
  &#8226;   <a href="#math">math</a>
  &#8226;   <a href="#pygame">pygame</a>
  &#8226;   <a href="#random">random</a>
@@ -3140,12 +3163,10 @@ imports:
  &#8226;   <a href="#sistemler.perk_sistemi">sistemler.perk_sistemi</a>
  &#8226;   <a href="#sistemler.puan_sistemi">sistemler.puan_sistemi</a>
  &#8226;   <a href="#sistemler.ses_sistemi">sistemler.ses_sistemi</a>
- &#8226;   <a href="#varliklar.drop">varliklar.drop</a>
  &#8226;   <a href="#varliklar.isik">varliklar.isik</a>
  &#8226;   <a href="#varliklar.oyuncu">varliklar.oyuncu</a>
  &#8226;   <a href="#varliklar.parcacik">varliklar.parcacik</a>
  &#8226;   <a href="#varliklar.patlama">varliklar.patlama</a>
- &#8226;   <a href="#varliklar.zombi">varliklar.zombi</a>
 
   </div>
   <div class="import">
@@ -7562,6 +7583,7 @@ imported by:
  &#8226;   <a href="#_pydecimal">_pydecimal</a>
  &#8226;   <a href="#asyncio.windows_events">asyncio.windows_events</a>
  &#8226;   <a href="#ekranlar.ana_menu">ekranlar.ana_menu</a>
+ &#8226;   <a href="#ekranlar.hud">ekranlar.hud</a>
  &#8226;   <a href="#ekranlar.oyun_bitti">ekranlar.oyun_bitti</a>
  &#8226;   <a href="#ekranlar.oyun_ekrani">ekranlar.oyun_ekrani</a>
  &#8226;   <a href="#fractions">fractions</a>
@@ -9021,8 +9043,10 @@ imports:
   </div>
   <div class="import">
 imported by:
-    <a href="#ekranlar.ana_menu">ekranlar.ana_menu</a>
+    <a href="#ayarlar">ayarlar</a>
+ &#8226;   <a href="#ekranlar.ana_menu">ekranlar.ana_menu</a>
  &#8226;   <a href="#ekranlar.duraklama">ekranlar.duraklama</a>
+ &#8226;   <a href="#ekranlar.hud">ekranlar.hud</a>
  &#8226;   <a href="#ekranlar.oyun_bitti">ekranlar.oyun_bitti</a>
  &#8226;   <a href="#ekranlar.oyun_ekrani">ekranlar.oyun_ekrani</a>
  &#8226;   <a href="#ekranlar.shop">ekranlar.shop</a>
@@ -9926,7 +9950,8 @@ imports:
   </div>
   <div class="import">
 imported by:
-    <a href="#ekranlar.oyun_ekrani">ekranlar.oyun_ekrani</a>
+    <a href="#ekranlar.hud">ekranlar.hud</a>
+ &#8226;   <a href="#ekranlar.oyun_ekrani">ekranlar.oyun_ekrani</a>
  &#8226;   <a href="#ekranlar.shop">ekranlar.shop</a>
  &#8226;   <a href="#email.generator">email.generator</a>
  &#8226;   <a href="#email.utils">email.utils</a>
@@ -10370,7 +10395,8 @@ imports:
   </div>
   <div class="import">
 imported by:
-    <a href="#ekranlar.oyun_ekrani">ekranlar.oyun_ekrani</a>
+    <a href="#ekranlar.hud">ekranlar.hud</a>
+ &#8226;   <a href="#ekranlar.oyun_ekrani">ekranlar.oyun_ekrani</a>
 
   </div>
 
@@ -11487,8 +11513,7 @@ imports:
   </div>
   <div class="import">
 imported by:
-    <a href="#ekranlar.oyun_ekrani">ekranlar.oyun_ekrani</a>
- &#8226;   <a href="#varliklar.zombi">varliklar.zombi</a>
+    <a href="#varliklar.zombi">varliklar.zombi</a>
 
   </div>
 
@@ -11607,8 +11632,7 @@ imports:
   </div>
   <div class="import">
 imported by:
-    <a href="#ekranlar.oyun_ekrani">ekranlar.oyun_ekrani</a>
- &#8226;   <a href="#sistemler.dalga_sistemi">sistemler.dalga_sistemi</a>
+    <a href="#sistemler.dalga_sistemi">sistemler.dalga_sistemi</a>
 
   </div>
 

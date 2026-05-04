@@ -15,6 +15,8 @@ from varliklar.mermi import Mermi
 from sistemler.ses_sistemi import ses_sis
 import ayarlar
 
+# ses_sis döngü içinde import edilmez — modül düzeyinde tek kez yüklenir
+
 class Oyuncu(pygame.sprite.Sprite):
     def __init__(self, x, y):
         super().__init__()
@@ -123,7 +125,7 @@ class Oyuncu(pygame.sprite.Sprite):
     @property
     def max_can_degeri(self): return self.max_can + self.yukseltmeler["can"] * 40
     @property
-    def zirh_carpani(self): return max(0.2, 1.0 - self.yukseltmeler["zirh"] * 0.12) * ayarlar.ZORLUK_CARPANI
+    def zirh_carpani(self): return max(0.2, 1.0 - self.yukseltmeler["zirh"] * 0.12)
     @property
     def max_kalkan_degeri(self): return self.max_kalkan + self.yukseltmeler["kalkan"] * 40
     @property
@@ -257,7 +259,6 @@ class Oyuncu(pygame.sprite.Sprite):
         sprint_aktif = tuslar.get("sprint", False) and self.stamina > 0 and not self.yoruldu_mu
         self._ayak_sayac = getattr(self, '_ayak_sayac', 0) - dt
         if (dx != 0 or dy != 0) and self._ayak_sayac <= 0:
-            from sistemler.ses_sistemi import ses_sis
             ses_sis.oynat("ayak_sesi", volume=0.3)
             self._ayak_sayac = 0.35 if not sprint_aktif else 0.2
             

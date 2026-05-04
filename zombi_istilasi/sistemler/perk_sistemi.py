@@ -35,10 +35,31 @@ class PerkSistemi:
             secilen = self.secenekler[indeks]
             if secilen not in self.aktif_perkler:
                 self.aktif_perkler.append(secilen)
-            self.secim_bekliyor = False
             self.secenekler = []
             return secilen
         return None
+
+    def tik_isle(self, event, genislik, yukseklik):
+        import pygame
+        if not self.secim_bekliyor:
+            return False
+
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_1: self.perk_sec(0); return True
+            elif event.key == pygame.K_2: self.perk_sec(1); return True
+            elif event.key == pygame.K_3: self.perk_sec(2); return True
+        elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            kart_gen, kart_yuk, bosluk = 280, 220, 40
+            n = len(self.secenekler)
+            toplam = n * (kart_gen + bosluk) - bosluk
+            sx = genislik // 2 - toplam // 2
+            sy = yukseklik // 2 - kart_yuk // 2
+            for i in range(n):
+                kx, ky = sx + i * (kart_gen + bosluk), sy
+                if pygame.Rect(kx, ky, kart_gen, kart_yuk).collidepoint(event.pos):
+                    self.perk_sec(i)
+                    return True
+        return False
 
     def uygula_olum(self, oyuncu, zombi):
         """Zombi öldüğünde uygulanacak perk efektleri."""

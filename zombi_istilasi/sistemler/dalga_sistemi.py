@@ -19,10 +19,8 @@ class DalgaSistemi:
         self.bildirim_sayac = 0.0
         self.bildirim_metni = ""
         self.aktif_mod = None  # Görev 3: Mevcut dalga modu
-        # BUG FIX: ZORLUK_CARPANI artik instance degiskeni.
-        # Oyun resetlendiginde yeni DalgaSistemi olusturulur, otomatik sifirlanir.
+        # ZORLUK_CARPANI artik instance degiskeni.
         self.zorluk_carpani = 1.0
-        ayarlar.ZORLUK_CARPANI = 1.0  # Geriye uyum icin global da sifirla
 
     def _dalga_olustur(self, dalga_no):
         liste = []
@@ -77,7 +75,7 @@ class DalgaSistemi:
             self.spawn_sayac -= dt
             if self.spawn_sayac <= 0:
                 tip = self.spawn_listesi.pop(0)
-                yeni_z = Zombi.rastgele_dogur(ekran_w, ekran_h, tip)
+                yeni_z = Zombi.rastgele_dogur(ekran_w, ekran_h, tip, zorluk_carpani=self.zorluk_carpani)
                 self._mod_uygula(yeni_z)
                 self.zombiler.add(yeni_z)
                 self.spawn_sayac = self.spawn_aralik
@@ -93,7 +91,6 @@ class DalgaSistemi:
     def _yeni_dalga_baslat(self, ekran_w, ekran_h):
         self.dalga_no += 1
         self.zorluk_carpani = 1.0 + (self.dalga_no * 0.1)
-        ayarlar.ZORLUK_CARPANI = self.zorluk_carpani  # Geriye uyum
         
         # Boss dalgasında mod yok
         if self.dalga_no % 5 == 0:

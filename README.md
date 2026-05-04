@@ -4,11 +4,14 @@ Pygame ile geliştirilmiş, 2D yukarıdan bakışlı (top-down) zombi hayatta ka
 
 ## Özellikler
 - **55 Farklı Silah:** Tabancalar, pompalı tüfekler, taarruz tüfekleri, keskin nişancı tüfekleri, enerji silahları ve daha fazlası.
+- **Silah Görselleri ve Hasar Mekanikleri:** Her silah tipine özel mermi/efekt görselleri (lazer, plazma, alev makinesi, patlayıcılar) ve dengelenmiş patlayıcı hasarları.
 - **Element Sistemi:** Ateş (yakıcı), Buz (yavaşlatıcı), Zehir (zamanla hasar), Elektrik (seken hasar) ve Kinetik (itme kuvveti) efektleriyle stratejik savaş.
 - **Gelişmiş Zombi Yapay Zekası:** Çeşitli zombi tipleri (Hızlı, Tank, Menzilli, vb.) ve sürü davranışları.
 - **Market (Shop) Sistemi:** Dalgalar arasında veya oyun içinde silah satın alma, mermi yenileme ve can doldurma imkanı.
 - **Açık Dünya / Arena Karışımı:** Geniş ve keşfedilebilir devasa harita, farklı bölgeler.
 - **Gelişmiş Görsel Efektler:** Silahlara ve elementlere özel mermi izleri, çarpma efektleri (kan, parçacık, duman, lazer) ve kamera sarsıntısı.
+- **Gelişmiş Ses Sistemi:** Yapay zeka (ElevenLabs) ile oluşturulmuş özel karakter/hasar sesleri, ayak sesleri, dinamik silah/patlama sesleri ve ses çakışmalarını (overlapping) önleyen gelişmiş kanal yönetimi.
+- **Optimize Edilmiş Mimari:** Global değişkenlerden arındırılmış, modüler, çapraz platform destekli ve yüksek performanslı modern kod mimarisi.
 
 ## Kurulum
 

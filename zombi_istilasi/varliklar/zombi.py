@@ -9,7 +9,7 @@ from ayarlar import ZOMBI_TIPLER, SIYAH, ZAFIYET_TABLOSU
 from varliklar.drop import Drop
 
 class Zombi(pygame.sprite.Sprite):
-    def __init__(self, x, y, tip="normal"):
+    def __init__(self, x, y, tip="normal", zorluk_carpani=1.0):
         super().__init__()
         self.x = float(x)
         self.y = float(y)
@@ -17,9 +17,9 @@ class Zombi(pygame.sprite.Sprite):
         v = ZOMBI_TIPLER[tip]
         self.baz_hiz = float(v["hiz"])
         self.hiz = self.baz_hiz
-        self.can = float(v["can"]) * ayarlar.ZORLUK_CARPANI
-        self.max_can = float(v["can"]) * ayarlar.ZORLUK_CARPANI
-        self.hasar = v["hasar"] * ayarlar.ZORLUK_CARPANI
+        self.can = float(v["can"]) * zorluk_carpani
+        self.max_can = float(v["can"]) * zorluk_carpani
+        self.hasar = v["hasar"] * zorluk_carpani
         self.skor = v["skor"]
         self.para = v["para"]
         self.yari_cap = v["r"]
@@ -111,6 +111,7 @@ class Zombi(pygame.sprite.Sprite):
             self.donma_sayac -= dt
             self.hiz = self.baz_hiz * 0.4
         elif self.zehir_hasar_sayac > 0:
+            # Zehirli zombi yavaşlar ama hareket eder
             self.hiz = self.baz_hiz * 0.8
         else:
             self.hiz = self.baz_hiz
@@ -236,11 +237,11 @@ class Zombi(pygame.sprite.Sprite):
             pygame.draw.rect(ekran, renk, (cx-bar_gen//2, cy-self.yari_cap-11, dolu, bar_yuk), border_radius=2)
 
     @staticmethod
-    def rastgele_dogur(ekran_w, ekran_h, tip="normal"):
+    def rastgele_dogur(ekran_w, ekran_h, tip="normal", zorluk_carpani=1.0):
         kenar = random.randint(0, 3)
         off = 90
         if kenar == 0:   x, y = random.randint(0, ekran_w), -off
         elif kenar == 1: x, y = ekran_w+off, random.randint(0, ekran_h)
         elif kenar == 2: x, y = random.randint(0, ekran_w), ekran_h+off
         else:            x, y = -off, random.randint(0, ekran_h)
-        return Zombi(x, y, tip)
+        return Zombi(x, y, tip, zorluk_carpani=zorluk_carpani)

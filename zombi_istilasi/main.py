@@ -75,9 +75,6 @@ def main():
 
     durum = DURUM_MENU
     _fare_durumu_ayarla(aktif_oyun=False)
-    cheat_mesaj = ""
-    cheat_mesaj_sayac = 0.0
-    _font_cheat = pygame.font.SysFont("Consolas", 20, bold=True)  # Font bir kez olustur, her frame degil
 
     while True:
         dt = min(saat.tick(FPS) / 1000.0, 0.05)
@@ -138,7 +135,7 @@ def main():
                 if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
                     durum = DURUM_OYUN
                     ses_sis.devam_et()
-                    _fare_durumu_ayarla(aktif_oyun=False)
+                    _fare_durumu_ayarla(aktif_oyun=not oyun_ekrani.perk_sis.secim_bekliyor)
                 
                 sonuc = shop.tik_isle(event, oyun_ekrani.oyuncu, oyun_ekrani.puan_sis)
                 if sonuc == "devam":
@@ -150,27 +147,11 @@ def main():
                         oyun_ekrani.perk_sis.perk_sec_hazirla()
                     durum = DURUM_OYUN
                     ses_sis.devam_et()
-                    _fare_durumu_ayarla(aktif_oyun=False)
+                    _fare_durumu_ayarla(aktif_oyun=not oyun_ekrani.perk_sis.secim_bekliyor)
 
-            # Perk seçimi hem klavye hem fare tıklamasıyla
             if durum == DURUM_OYUN and oyun_ekrani.perk_sis.secim_bekliyor:
-                if event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_1: oyun_ekrani.perk_sis.perk_sec(0)
-                    elif event.key == pygame.K_2: oyun_ekrani.perk_sis.perk_sec(1)
-                    elif event.key == pygame.K_3: oyun_ekrani.perk_sis.perk_sec(2)
-                elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                    # Hangi karta tıklandı?
-                    p = oyun_ekrani.perk_sis
-                    kart_gen, kart_yuk, bosluk = 280, 220, 40
-                    n = len(p.secenekler)
-                    toplam = n * (kart_gen + bosluk) - bosluk
-                    sx = GENISLIK // 2 - toplam // 2
-                    sy = YUKSEKLIK // 2 - kart_yuk // 2
-                    for i in range(n):
-                        kx, ky = sx + i * (kart_gen + bosluk), sy
-                        if pygame.Rect(kx, ky, kart_gen, kart_yuk).collidepoint(event.pos):
-                            p.perk_sec(i)
-                            break
+                if oyun_ekrani.perk_sis.tik_isle(event, GENISLIK, YUKSEKLIK):
+                    _fare_durumu_ayarla(aktif_oyun=True)
 
             elif durum == DURUM_BITTI:
                 sonuc = oyun_bitti.tik_isle(event)
@@ -224,15 +205,6 @@ def main():
             shop.ciz(ekran, oyun_ekrani.oyuncu, oyun_ekrani.puan_sis)
         elif durum == DURUM_BITTI:
             oyun_bitti.ciz(ekran)
-
-        # Cheat mesaj countdown
-        if cheat_mesaj_sayac > 0:
-            cheat_mesaj_sayac -= dt
-
-        # Cheat mesaji flip ONCESINDE cizilmeli (flip sonrasi gorunmez)
-        if cheat_mesaj_sayac > 0 and durum == DURUM_OYUN:
-            ct = _font_cheat.render(cheat_mesaj, True, (0, 255, 80))
-            ekran.blit(ct, (GENISLIK // 2 - ct.get_width() // 2, 12))
 
         pygame.display.flip()
 
